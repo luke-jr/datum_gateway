@@ -163,6 +163,12 @@ void datum_api_var_STRATUM_JOB_INFO(char *buffer, size_t buffer_size, const T_DA
 	if (!vardata->sjob) return;
 	snprintf(buffer, buffer_size, "%s (%d) @ %.3f", vardata->sjob->job_id, vardata->sjob->global_index, (double)vardata->sjob->tsms / 1000.0);
 }
+MAKE_API_S(STRATUM_JOB_ID, vardata->sjob->job_id)
+MAKE_API_D(STRATUM_JOB_INDEX, vardata->sjob->global_index)
+void datum_api_var_STRATUM_JOB_TIMESTAMP(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+	if (!vardata->sjob) return;
+	snprintf(buffer, buffer_size, "%.3f", (double)vardata->sjob->tsms / 1000.0);
+}
 MAKE_API_LLU(STRATUM_JOB_BLOCK_HEIGHT, vardata->sjob->block_template->height)
 void datum_api_var_STRATUM_JOB_BLOCK_VALUE(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.8f BTC", (double)vardata->sjob->block_template->coinbasevalue / (double)100000000.0);
@@ -216,6 +222,9 @@ DATUM_API_VarEntry var_entries[] = {
 	{"STRATUM_HASHRATE_ESTIMATE", datum_api_var_STRATUM_HASHRATE_ESTIMATE},
 	
 	{"STRATUM_JOB_INFO", datum_api_var_STRATUM_JOB_INFO},
+	{"STRATUM_JOB_ID", datum_api_var_STRATUM_JOB_ID},
+	{"STRATUM_JOB_INDEX", datum_api_var_STRATUM_JOB_INDEX},
+	{"STRATUM_JOB_TIMESTAMP", datum_api_var_STRATUM_JOB_TIMESTAMP},
 	{"STRATUM_JOB_BLOCK_HEIGHT", datum_api_var_STRATUM_JOB_BLOCK_HEIGHT},
 	{"STRATUM_JOB_BLOCK_VALUE", datum_api_var_STRATUM_JOB_BLOCK_VALUE},
 	{"STRATUM_JOB_PREVBLOCK", datum_api_var_STRATUM_JOB_PREVBLOCK},
