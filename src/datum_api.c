@@ -76,11 +76,22 @@ static void html_leading_zeros(char * const buffer, const size_t buffer_size, co
 	}
 }
 
+#define MAKE_API_D(api_var, val)  \
+	static void datum_api_var_ ## api_var(char * const buffer, const size_t buffer_size, const T_DATUM_API_DASH_VARS * const vardata) {  \
+		snprintf(buffer, buffer_size, "%d", (int)(val));  \
+	}  \
+// end of MAKE_API_D
 #define MAKE_API_LLU(api_var, val)  \
 	static void datum_api_var_ ## api_var(char * const buffer, const size_t buffer_size, const T_DATUM_API_DASH_VARS * const vardata) {  \
 		snprintf(buffer, buffer_size, "%llu", (unsigned long long)(val));  \
 	}  \
 // end of MAKE_API_LLU
+#define MAKE_API_S(api_var, val)  \
+	static void datum_api_var_ ## api_var(char * const buffer, const size_t buffer_size, const T_DATUM_API_DASH_VARS * const vardata) {  \
+		snprintf(buffer, buffer_size, "%s", (val));  \
+	}  \
+// end of MAKE_API_S
+
 MAKE_API_LLU(DATUM_SHARES_ACCEPTED_ABSOLUTE, datum_accepted_share_count)
 MAKE_API_LLU(DATUM_SHARES_ACCEPTED_WEIGHED, datum_accepted_share_diff)
 MAKE_API_LLU(DATUM_SHARES_REJECTED_ABSOLUTE, datum_rejected_share_count)
@@ -123,18 +134,10 @@ void datum_api_var_DATUM_MINER_TAG(char *buffer, size_t buffer_size, const T_DAT
 	buffer[i+2] = 0;
 }
 MAKE_API_LLU(DATUM_POOL_DIFF, datum_config.override_vardiff_min)
-void datum_api_var_DATUM_POOL_PUBKEY(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%s", datum_config.datum_pool_pubkey);
-}
-void datum_api_var_STRATUM_ACTIVE_THREADS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%d", vardata->STRATUM_ACTIVE_THREADS);
-}
-void datum_api_var_STRATUM_TOTAL_CONNECTIONS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%d", vardata->STRATUM_TOTAL_CONNECTIONS);
-}
-void datum_api_var_STRATUM_TOTAL_SUBSCRIPTIONS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%d", vardata->STRATUM_TOTAL_SUBSCRIPTIONS);
-}
+MAKE_API_S(DATUM_POOL_PUBKEY, datum_config.datum_pool_pubkey)
+MAKE_API_D(STRATUM_ACTIVE_THREADS, vardata->STRATUM_ACTIVE_THREADS)
+MAKE_API_D(STRATUM_TOTAL_CONNECTIONS, vardata->STRATUM_TOTAL_CONNECTIONS)
+MAKE_API_D(STRATUM_TOTAL_SUBSCRIPTIONS, vardata->STRATUM_TOTAL_SUBSCRIPTIONS)
 void datum_api_var_STRATUM_HASHRATE_ESTIMATE(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.2f Th/sec", vardata->STRATUM_HASHRATE_ESTIMATE);
 }
@@ -152,36 +155,24 @@ void datum_api_var_STRATUM_JOB_TARGET(char *buffer, size_t buffer_size, const T_
 void datum_api_var_STRATUM_JOB_PREVBLOCK(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	html_leading_zeros(buffer, buffer_size, vardata->sjob->block_template->previousblockhash);
 }
-void datum_api_var_STRATUM_JOB_WITNESS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%s", vardata->sjob->block_template->default_witness_commitment);
-}
+MAKE_API_S(STRATUM_JOB_WITNESS, vardata->sjob->block_template->default_witness_commitment)
 void datum_api_var_STRATUM_JOB_DIFF(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.3Lf", calc_network_difficulty(vardata->sjob->nbits));
 }
 void datum_api_var_STRATUM_JOB_VERSION(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%s (%u)", vardata->sjob->version, (unsigned)vardata->sjob->version_uint);
 }
-void datum_api_var_STRATUM_JOB_BITS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%s", vardata->sjob->nbits);
-}
+MAKE_API_S(STRATUM_JOB_BITS, vardata->sjob->nbits)
 void datum_api_var_STRATUM_JOB_TIMEINFO(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "Current: %llu / Min: %llu", (unsigned long long)vardata->sjob->block_template->curtime, (unsigned long long)vardata->sjob->block_template->mintime);
 }
 void datum_api_var_STRATUM_JOB_LIMITINFO(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "Size: %lu, Weight: %lu, SigOps: %lu", (unsigned long)vardata->sjob->block_template->sizelimit, (unsigned long)vardata->sjob->block_template->weightlimit, (unsigned long)vardata->sjob->block_template->sigoplimit);
 }
-void datum_api_var_STRATUM_JOB_SIZE(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%lu", (unsigned long)vardata->sjob->block_template->txn_total_size);
-}
-void datum_api_var_STRATUM_JOB_WEIGHT(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%lu", (unsigned long)vardata->sjob->block_template->txn_total_weight);
-}
-void datum_api_var_STRATUM_JOB_SIGOPS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%lu", (unsigned long)vardata->sjob->block_template->txn_total_sigops);
-}
-void datum_api_var_STRATUM_JOB_TXNCOUNT(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%u", (unsigned)vardata->sjob->block_template->txn_count);
-}
+MAKE_API_LLU(STRATUM_JOB_SIZE, vardata->sjob->block_template->txn_total_size)
+MAKE_API_LLU(STRATUM_JOB_WEIGHT, vardata->sjob->block_template->txn_total_weight)
+MAKE_API_LLU(STRATUM_JOB_SIGOPS, vardata->sjob->block_template->txn_total_sigops)
+MAKE_API_LLU(STRATUM_JOB_TXNCOUNT, vardata->sjob->block_template->txn_count)
 
 
 DATUM_API_VarEntry var_entries[] = {
