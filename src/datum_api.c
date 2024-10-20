@@ -186,9 +186,8 @@ MAKE_API_S(STRATUM_JOB_WITNESS, vardata->sjob->block_template->default_witness_c
 void datum_api_var_STRATUM_JOB_DIFF(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.3Lf", calc_network_difficulty(vardata->sjob->nbits));
 }
-void datum_api_var_STRATUM_JOB_VERSION(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%s (%u)", vardata->sjob->version, (unsigned)vardata->sjob->version_uint);
-}
+MAKE_API_S(STRATUM_JOB_VERSION_HEX, vardata->sjob->version)
+MAKE_API_LLU(STRATUM_JOB_VERSION, vardata->sjob->version_uint)
 MAKE_API_S(STRATUM_JOB_BITS, vardata->sjob->nbits)
 void datum_api_var_STRATUM_JOB_TIMEINFO(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "Current: %llu / Min: %llu", (unsigned long long)vardata->sjob->block_template->curtime, (unsigned long long)vardata->sjob->block_template->mintime);
@@ -238,6 +237,7 @@ DATUM_API_VarEntry var_entries[] = {
 	{"STRATUM_JOB_WITNESS", datum_api_var_STRATUM_JOB_WITNESS},
 	{"STRATUM_JOB_DIFF", datum_api_var_STRATUM_JOB_DIFF},
 	{"STRATUM_JOB_VERSION", datum_api_var_STRATUM_JOB_VERSION},
+	{"STRATUM_JOB_VERSION_HEX", datum_api_var_STRATUM_JOB_VERSION_HEX},
 	{"STRATUM_JOB_BITS", datum_api_var_STRATUM_JOB_BITS},
 	{"STRATUM_JOB_TIMEINFO", datum_api_var_STRATUM_JOB_TIMEINFO},
 	{"STRATUM_JOB_LIMITINFO", datum_api_var_STRATUM_JOB_LIMITINFO},
