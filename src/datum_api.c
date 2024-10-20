@@ -76,12 +76,15 @@ static void html_leading_zeros(char * const buffer, const size_t buffer_size, co
 	}
 }
 
-void datum_api_var_DATUM_SHARES_ACCEPTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%llu  (%llu diff)", (unsigned long long)datum_accepted_share_count, (unsigned long long)datum_accepted_share_diff);
-}
-void datum_api_var_DATUM_SHARES_REJECTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%llu  (%llu diff)", (unsigned long long)datum_rejected_share_count, (unsigned long long)datum_rejected_share_diff);
-}
+#define MAKE_API_LLU(api_var, val)  \
+	static void datum_api_var_ ## api_var(char * const buffer, const size_t buffer_size, const T_DATUM_API_DASH_VARS * const vardata) {  \
+		snprintf(buffer, buffer_size, "%llu", (unsigned long long)(val));  \
+	}  \
+// end of MAKE_API_LLU
+MAKE_API_LLU(DATUM_SHARES_ACCEPTED_ABSOLUTE, datum_accepted_share_count)
+MAKE_API_LLU(DATUM_SHARES_ACCEPTED_WEIGHED, datum_accepted_share_diff)
+MAKE_API_LLU(DATUM_SHARES_REJECTED_ABSOLUTE, datum_rejected_share_count)
+MAKE_API_LLU(DATUM_SHARES_REJECTED_WEIGHED, datum_rejected_share_diff)
 void datum_api_var_DATUM_CONNECTION_STATUS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	const char *colour = "lime";
 	const char *s;
@@ -119,9 +122,7 @@ void datum_api_var_DATUM_MINER_TAG(char *buffer, size_t buffer_size, const T_DAT
 	buffer[i+1] = '"';
 	buffer[i+2] = 0;
 }
-void datum_api_var_DATUM_POOL_DIFF(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%llu", (unsigned long long)datum_config.override_vardiff_min);
-}
+MAKE_API_LLU(DATUM_POOL_DIFF, datum_config.override_vardiff_min)
 void datum_api_var_DATUM_POOL_PUBKEY(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%s", datum_config.datum_pool_pubkey);
 }
@@ -141,9 +142,7 @@ void datum_api_var_STRATUM_JOB_INFO(char *buffer, size_t buffer_size, const T_DA
 	if (!vardata->sjob) return;
 	snprintf(buffer, buffer_size, "%s (%d) @ %.3f", vardata->sjob->job_id, vardata->sjob->global_index, (double)vardata->sjob->tsms / 1000.0);
 }
-void datum_api_var_STRATUM_JOB_BLOCK_HEIGHT(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "%llu", (unsigned long long)vardata->sjob->block_template->height);
-}
+MAKE_API_LLU(STRATUM_JOB_BLOCK_HEIGHT, vardata->sjob->block_template->height)
 void datum_api_var_STRATUM_JOB_BLOCK_VALUE(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.8f BTC", (double)vardata->sjob->block_template->coinbasevalue / (double)100000000.0);
 }
@@ -186,8 +185,10 @@ void datum_api_var_STRATUM_JOB_TXNCOUNT(char *buffer, size_t buffer_size, const 
 
 
 DATUM_API_VarEntry var_entries[] = {
-	{"DATUM_SHARES_ACCEPTED", datum_api_var_DATUM_SHARES_ACCEPTED},
-	{"DATUM_SHARES_REJECTED", datum_api_var_DATUM_SHARES_REJECTED},
+	{"DATUM_SHARES_ACCEPTED_ABSOLUTE", datum_api_var_DATUM_SHARES_ACCEPTED_ABSOLUTE},
+	{"DATUM_SHARES_ACCEPTED_WEIGHED", datum_api_var_DATUM_SHARES_ACCEPTED_WEIGHED},
+	{"DATUM_SHARES_REJECTED_ABSOLUTE", datum_api_var_DATUM_SHARES_REJECTED_ABSOLUTE},
+	{"DATUM_SHARES_REJECTED_WEIGHED", datum_api_var_DATUM_SHARES_REJECTED_WEIGHED},
 	{"DATUM_CONNECTION_STATUS", datum_api_var_DATUM_CONNECTION_STATUS},
 	{"DATUM_POOL_HOST", datum_api_var_DATUM_POOL_HOST},
 	{"DATUM_POOL_TAG", datum_api_var_DATUM_POOL_TAG},
