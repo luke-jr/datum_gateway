@@ -153,8 +153,11 @@ MAKE_API_S(DATUM_POOL_PUBKEY, datum_config.datum_pool_pubkey)
 MAKE_API_D(STRATUM_ACTIVE_THREADS, vardata->STRATUM_ACTIVE_THREADS)
 MAKE_API_D(STRATUM_TOTAL_CONNECTIONS, vardata->STRATUM_TOTAL_CONNECTIONS)
 MAKE_API_D(STRATUM_TOTAL_SUBSCRIPTIONS, vardata->STRATUM_TOTAL_SUBSCRIPTIONS)
-void datum_api_var_STRATUM_HASHRATE_ESTIMATE(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+void datum_api_var_STRATUM_HASHRATE_ESTIMATE_FORMATTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.2f Th/sec", vardata->STRATUM_HASHRATE_ESTIMATE);
+}
+void datum_api_var_STRATUM_HASHRATE_ESTIMATE(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+	snprintf(buffer, buffer_size, "%.0f", vardata->STRATUM_HASHRATE_ESTIMATE * 1e12);
 }
 void datum_api_var_STRATUM_JOB_INFO(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	if (!vardata->sjob) return;
@@ -209,6 +212,7 @@ DATUM_API_VarEntry var_entries[] = {
 	{"STRATUM_ACTIVE_THREADS", datum_api_var_STRATUM_ACTIVE_THREADS},
 	{"STRATUM_TOTAL_CONNECTIONS", datum_api_var_STRATUM_TOTAL_CONNECTIONS},
 	{"STRATUM_TOTAL_SUBSCRIPTIONS", datum_api_var_STRATUM_TOTAL_SUBSCRIPTIONS},
+	{"STRATUM_HASHRATE_ESTIMATE_FORMATTED", datum_api_var_STRATUM_HASHRATE_ESTIMATE_FORMATTED},
 	{"STRATUM_HASHRATE_ESTIMATE", datum_api_var_STRATUM_HASHRATE_ESTIMATE},
 	
 	{"STRATUM_JOB_INFO", datum_api_var_STRATUM_JOB_INFO},
