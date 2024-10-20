@@ -191,9 +191,9 @@ MAKE_API_LLU(STRATUM_JOB_VERSION, vardata->sjob->version_uint)
 MAKE_API_S(STRATUM_JOB_BITS, vardata->sjob->nbits)
 MAKE_API_LLU(STRATUM_JOB_CURTIME, vardata->sjob->block_template->curtime)
 MAKE_API_LLU(STRATUM_JOB_MINTIME, vardata->sjob->block_template->mintime)
-void datum_api_var_STRATUM_JOB_LIMITINFO(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	snprintf(buffer, buffer_size, "Size: %lu, Weight: %lu, SigOps: %lu", (unsigned long)vardata->sjob->block_template->sizelimit, (unsigned long)vardata->sjob->block_template->weightlimit, (unsigned long)vardata->sjob->block_template->sigoplimit);
-}
+MAKE_API_LLU(STRATUM_JOB_SIZE_LIMIT, vardata->sjob->block_template->sizelimit)
+MAKE_API_LLU(STRATUM_JOB_WEIGHT_LIMIT, vardata->sjob->block_template->weightlimit)
+MAKE_API_LLU(STRATUM_JOB_SIGOP_LIMIT, vardata->sjob->block_template->sigoplimit)
 MAKE_API_LLU(STRATUM_JOB_SIZE, vardata->sjob->block_template->txn_total_size)
 MAKE_API_LLU(STRATUM_JOB_WEIGHT, vardata->sjob->block_template->txn_total_weight)
 MAKE_API_LLU(STRATUM_JOB_SIGOPS, vardata->sjob->block_template->txn_total_sigops)
@@ -240,7 +240,9 @@ DATUM_API_VarEntry var_entries[] = {
 	{"STRATUM_JOB_BITS", datum_api_var_STRATUM_JOB_BITS},
 	{"STRATUM_JOB_CURTIME", datum_api_var_STRATUM_JOB_CURTIME},
 	{"STRATUM_JOB_MINTIME", datum_api_var_STRATUM_JOB_MINTIME},
-	{"STRATUM_JOB_LIMITINFO", datum_api_var_STRATUM_JOB_LIMITINFO},
+	{"STRATUM_JOB_SIZE_LIMIT", datum_api_var_STRATUM_JOB_SIZE_LIMIT},
+	{"STRATUM_JOB_WEIGHT_LIMIT", datum_api_var_STRATUM_JOB_WEIGHT_LIMIT},
+	{"STRATUM_JOB_SIGOP_LIMIT", datum_api_var_STRATUM_JOB_SIGOP_LIMIT},
 	{"STRATUM_JOB_SIZE", datum_api_var_STRATUM_JOB_SIZE},
 	{"STRATUM_JOB_WEIGHT", datum_api_var_STRATUM_JOB_WEIGHT},
 	{"STRATUM_JOB_SIGOPS", datum_api_var_STRATUM_JOB_SIGOPS},
