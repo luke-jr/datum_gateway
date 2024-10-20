@@ -56,6 +56,7 @@
 const char * const homepage_html_end = "</body></html>";
 
 #define DATUM_API_HOMEPAGE_MAX_SIZE 128000
+#define DATUM_API_VAR_MAX_SIZE 128
 
 const char *cbnames[] = {
 	"Blank",
@@ -690,24 +691,21 @@ int datum_api_client_dashboard(struct MHD_Connection *connection) {
 	return ret;
 }
 
-int datum_api_homepage(struct MHD_Connection *connection) {
-	struct MHD_Response *response;
-	char output[DATUM_API_HOMEPAGE_MAX_SIZE];
-	int j, k = 0, kk = 0, ii, ret;
+static void datum_api_prepare_vardata(T_DATUM_API_DASH_VARS * const vardata) {
+	int j, k = 0, kk = 0, ii;
 	T_DATUM_MINER_DATA *m;
-	T_DATUM_API_DASH_VARS vardata;
 	unsigned char astat;
 	double thr = 0.0;
 	double hr;
 	uint64_t tsms;
 	
-	memset(&vardata, 0, sizeof(T_DATUM_API_DASH_VARS));
-
+	memset(vardata, 0, sizeof(T_DATUM_API_DASH_VARS));
+	
 	pthread_rwlock_rdlock(&stratum_global_job_ptr_lock);
 	j = global_latest_stratum_job_index;
-	vardata.sjob = (j >= 0 && j < MAX_STRATUM_JOBS) ? global_cur_stratum_jobs[j] : NULL;
+	vardata->sjob = (j >= 0 && j < MAX_STRATUM_JOBS) ? global_cur_stratum_jobs[j] : NULL;
 	pthread_rwlock_unlock(&stratum_global_job_ptr_lock);
-
+	
 	tsms = current_time_millis();
 	
 	if (global_stratum_app) {
@@ -732,16 +730,25 @@ int datum_api_homepage(struct MHD_Connection *connection) {
 				}
 			}
 		}
-		vardata.STRATUM_ACTIVE_THREADS = global_stratum_app->datum_active_threads;
-		vardata.STRATUM_TOTAL_CONNECTIONS = k;
-		vardata.STRATUM_TOTAL_SUBSCRIPTIONS = kk;
-		vardata.STRATUM_HASHRATE_ESTIMATE = thr;
+		vardata->STRATUM_ACTIVE_THREADS = global_stratum_app->datum_active_threads;
+		vardata->STRATUM_TOTAL_CONNECTIONS = k;
+		vardata->STRATUM_TOTAL_SUBSCRIPTIONS = kk;
+		vardata->STRATUM_HASHRATE_ESTIMATE = thr;
 	} else {
-		vardata.STRATUM_ACTIVE_THREADS = 0;
-		vardata.STRATUM_TOTAL_CONNECTIONS = 0;
-		vardata.STRATUM_TOTAL_SUBSCRIPTIONS = 0;
-		vardata.STRATUM_HASHRATE_ESTIMATE = 0.0;
+		vardata->STRATUM_ACTIVE_THREADS = 0;
+		vardata->STRATUM_TOTAL_CONNECTIONS = 0;
+		vardata->STRATUM_TOTAL_SUBSCRIPTIONS = 0;
+		vardata->STRATUM_HASHRATE_ESTIMATE = 0.0;
 	}
+}
+
+int datum_api_homepage(struct MHD_Connection *connection) {
+	struct MHD_Response *response;
+	char output[DATUM_API_HOMEPAGE_MAX_SIZE];
+	int ret;
+	T_DATUM_API_DASH_VARS vardata;
+	
+	datum_api_prepare_vardata(&vardata);
 	
 	output[0] = 0;
 	datum_api_fill_vars(www_home_html, output, DATUM_API_HOMEPAGE_MAX_SIZE, &vardata);
@@ -942,6 +949,38 @@ enum MHD_Result datum_api_answer(void *cls, struct MHD_Connection *connection, c
 				
 				datum_blocktemplates_notifynew("T", t);
 				return datum_api_OK(connection);
+			}
+			break;
+		}
+		
+		case 'v': {
+			if (!strncmp(url, "/v1/", 4)) {
+				const char * const var_name = &url[4];
+				DATUM_API_VarFunc func = datum_api_find_var_func(var_name);
+				if (!func) break;
+				
+				T_DATUM_API_DASH_VARS vardata;
+				datum_api_prepare_vardata(&vardata);
+				
+				// Skip running STRATUM_JOB functions if there's no sjob
+				if (var_name[8] == 'J' && !vardata.sjob) {
+					response = MHD_create_response_from_buffer(0, "", MHD_RESPMEM_PERSISTENT);
+					http_resp_prevent_caching(response);
+					ret = MHD_queue_response(connection, MHD_HTTP_NO_CONTENT, response);
+					MHD_destroy_response(response);
+					return ret;
+				}
+				
+				char val[DATUM_API_VAR_MAX_SIZE];
+				val[0] = 0;
+				func(val, sizeof(val), &vardata);
+				
+				response = MHD_create_response_from_buffer (strlen(val), val, MHD_RESPMEM_MUST_COPY);
+				MHD_add_response_header(response, "Content-Type", "text/plain");
+				http_resp_prevent_caching(response);
+				ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+				MHD_destroy_response(response);
+				return ret;
 			}
 			break;
 		}
