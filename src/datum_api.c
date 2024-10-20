@@ -132,20 +132,22 @@ void datum_api_var_DATUM_POOL_HOST(char *buffer, size_t buffer_size, const T_DAT
 		snprintf(buffer, buffer_size, "");
 	}
 }
-void datum_api_var_DATUM_POOL_TAG(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+void datum_api_var_DATUM_POOL_TAG_FORMATTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	size_t i;
 	buffer[0] = '"';
 	i = strncpy_html_escape(&buffer[1], datum_protocol_is_active()?datum_config.override_mining_coinbase_tag_primary:datum_config.mining_coinbase_tag_primary, buffer_size-3);
 	buffer[i+1] = '"';
 	buffer[i+2] = 0;
 }
-void datum_api_var_DATUM_MINER_TAG(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+MAKE_API_S(DATUM_POOL_TAG, datum_protocol_is_active() ? datum_config.override_mining_coinbase_tag_primary : datum_config.mining_coinbase_tag_primary)
+void datum_api_var_DATUM_MINER_TAG_FORMATTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	size_t i;
 	buffer[0] = '"';
 	i = strncpy_html_escape(&buffer[1], datum_config.mining_coinbase_tag_secondary, buffer_size-3);
 	buffer[i+1] = '"';
 	buffer[i+2] = 0;
 }
+MAKE_API_S(DATUM_MINER_TAG, datum_config.mining_coinbase_tag_secondary)
 MAKE_API_LLU(DATUM_POOL_DIFF, datum_config.override_vardiff_min)
 MAKE_API_S(DATUM_POOL_PUBKEY, datum_config.datum_pool_pubkey)
 MAKE_API_D(STRATUM_ACTIVE_THREADS, vardata->STRATUM_ACTIVE_THREADS)
@@ -197,7 +199,9 @@ DATUM_API_VarEntry var_entries[] = {
 	{"DATUM_CONNECTION_STATUS_DESCRIPTION", datum_api_var_DATUM_CONNECTION_STATUS_DESCRIPTION},
 	{"DATUM_POOL_HOST_OR_NA", datum_api_var_DATUM_POOL_HOST_OR_NA},
 	{"DATUM_POOL_HOST", datum_api_var_DATUM_POOL_HOST},
+	{"DATUM_POOL_TAG_FORMATTED", datum_api_var_DATUM_POOL_TAG_FORMATTED},
 	{"DATUM_POOL_TAG", datum_api_var_DATUM_POOL_TAG},
+	{"DATUM_MINER_TAG_FORMATTED", datum_api_var_DATUM_MINER_TAG_FORMATTED},
 	{"DATUM_MINER_TAG", datum_api_var_DATUM_MINER_TAG},
 	{"DATUM_POOL_DIFF", datum_api_var_DATUM_POOL_DIFF},
 	{"DATUM_POOL_PUBKEY", datum_api_var_DATUM_POOL_PUBKEY},
