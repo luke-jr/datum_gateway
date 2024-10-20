@@ -174,12 +174,14 @@ void datum_api_var_STRATUM_JOB_BLOCK_VALUE_FORMATTED(char *buffer, size_t buffer
 	snprintf(buffer, buffer_size, "%.8f BTC", (double)vardata->sjob->block_template->coinbasevalue / (double)100000000.0);
 }
 MAKE_API_LLU(STRATUM_JOB_BLOCK_VALUE, vardata->sjob->block_template->coinbasevalue)
-void datum_api_var_STRATUM_JOB_TARGET(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+void datum_api_var_STRATUM_JOB_TARGET_FORMATTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	html_leading_zeros(buffer, buffer_size, vardata->sjob->block_template->block_target_hex);
 }
-void datum_api_var_STRATUM_JOB_PREVBLOCK(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+MAKE_API_S(STRATUM_JOB_TARGET, vardata->sjob->block_template->block_target_hex)
+void datum_api_var_STRATUM_JOB_PREVBLOCK_FORMATTED(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	html_leading_zeros(buffer, buffer_size, vardata->sjob->block_template->previousblockhash);
 }
+MAKE_API_S(STRATUM_JOB_PREVBLOCK, vardata->sjob->block_template->previousblockhash)
 MAKE_API_S(STRATUM_JOB_WITNESS, vardata->sjob->block_template->default_witness_commitment)
 void datum_api_var_STRATUM_JOB_DIFF(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	snprintf(buffer, buffer_size, "%.3Lf", calc_network_difficulty(vardata->sjob->nbits));
@@ -229,7 +231,9 @@ DATUM_API_VarEntry var_entries[] = {
 	{"STRATUM_JOB_BLOCK_HEIGHT", datum_api_var_STRATUM_JOB_BLOCK_HEIGHT},
 	{"STRATUM_JOB_BLOCK_VALUE_FORMATTED", datum_api_var_STRATUM_JOB_BLOCK_VALUE_FORMATTED},
 	{"STRATUM_JOB_BLOCK_VALUE", datum_api_var_STRATUM_JOB_BLOCK_VALUE},
+	{"STRATUM_JOB_PREVBLOCK_FORMATTED", datum_api_var_STRATUM_JOB_PREVBLOCK_FORMATTED},
 	{"STRATUM_JOB_PREVBLOCK", datum_api_var_STRATUM_JOB_PREVBLOCK},
+	{"STRATUM_JOB_TARGET_FORMATTED", datum_api_var_STRATUM_JOB_TARGET_FORMATTED},
 	{"STRATUM_JOB_TARGET", datum_api_var_STRATUM_JOB_TARGET},
 	{"STRATUM_JOB_WITNESS", datum_api_var_STRATUM_JOB_WITNESS},
 	{"STRATUM_JOB_DIFF", datum_api_var_STRATUM_JOB_DIFF},
