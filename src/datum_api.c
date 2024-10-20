@@ -160,13 +160,11 @@ void datum_api_var_STRATUM_HASHRATE_ESTIMATE(char *buffer, size_t buffer_size, c
 	snprintf(buffer, buffer_size, "%.0f", vardata->STRATUM_HASHRATE_ESTIMATE * 1e12);
 }
 void datum_api_var_STRATUM_JOB_INFO(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	if (!vardata->sjob) return;
 	snprintf(buffer, buffer_size, "%s (%d) @ %.3f", vardata->sjob->job_id, vardata->sjob->global_index, (double)vardata->sjob->tsms / 1000.0);
 }
 MAKE_API_S(STRATUM_JOB_ID, vardata->sjob->job_id)
 MAKE_API_D(STRATUM_JOB_INDEX, vardata->sjob->global_index)
 void datum_api_var_STRATUM_JOB_TIMESTAMP(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	if (!vardata->sjob) return;
 	snprintf(buffer, buffer_size, "%.3f", (double)vardata->sjob->tsms / 1000.0);
 }
 MAKE_API_LLU(STRATUM_JOB_BLOCK_HEIGHT, vardata->sjob->block_template->height)
@@ -299,7 +297,10 @@ void datum_api_fill_vars(const char *input, char *output, size_t max_output_size
 			DATUM_API_VarFunc func = datum_api_find_var_func(var_name);
 			if (func) {
 				replacement[0] = 0;
-				func(replacement, sizeof(replacement), vardata);
+				// Skip running STRATUM_JOB functions if there's no sjob
+				if (var_name[8] != 'J' || vardata->sjob) {
+					func(replacement, sizeof(replacement), vardata);
+				}
 				replacement_len = strlen(replacement);
 				if (replacement_len) {
 					to_copy = (replacement_len < max_output_size - output_len - 1) ? replacement_len : max_output_size - output_len - 1;
