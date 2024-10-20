@@ -118,11 +118,18 @@ void datum_api_var_DATUM_CONNECTION_STATUS_DESCRIPTION(char *buffer, size_t buff
 	}
 	snprintf(buffer, buffer_size, "%s", s);
 }
-void datum_api_var_DATUM_POOL_HOST(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+void datum_api_var_DATUM_POOL_HOST_OR_NA(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	if (datum_config.datum_pool_host[0]) {
 		snprintf(buffer, buffer_size, "%s:%u", datum_config.datum_pool_host, (unsigned)datum_config.datum_pool_port);
 	} else {
 		snprintf(buffer, buffer_size, "N/A");
+	}
+}
+void datum_api_var_DATUM_POOL_HOST(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+	if (datum_config.datum_pool_host[0]) {
+		snprintf(buffer, buffer_size, "%s:%u", datum_config.datum_pool_host, (unsigned)datum_config.datum_pool_port);
+	} else {
+		snprintf(buffer, buffer_size, "");
 	}
 }
 void datum_api_var_DATUM_POOL_TAG(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
@@ -188,6 +195,7 @@ DATUM_API_VarEntry var_entries[] = {
 	{"DATUM_SHARES_REJECTED_WEIGHED", datum_api_var_DATUM_SHARES_REJECTED_WEIGHED},
 	{"DATUM_CONNECTION_STATUS_INDICATOR_COLOUR", datum_api_var_DATUM_CONNECTION_STATUS_INDICATOR_COLOUR},
 	{"DATUM_CONNECTION_STATUS_DESCRIPTION", datum_api_var_DATUM_CONNECTION_STATUS_DESCRIPTION},
+	{"DATUM_POOL_HOST_OR_NA", datum_api_var_DATUM_POOL_HOST_OR_NA},
 	{"DATUM_POOL_HOST", datum_api_var_DATUM_POOL_HOST},
 	{"DATUM_POOL_TAG", datum_api_var_DATUM_POOL_TAG},
 	{"DATUM_MINER_TAG", datum_api_var_DATUM_MINER_TAG},
