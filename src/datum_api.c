@@ -35,6 +35,7 @@
 
 // This is quick and dirty for now.  Will be improved over time.
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <microhttpd.h>
@@ -955,7 +956,12 @@ enum MHD_Result datum_api_answer(void *cls, struct MHD_Connection *connection, c
 		
 		case 'v': {
 			if (!strncmp(url, "/v1/", 4)) {
-				const char * const var_name = &url[4];
+				if (strlen(&url[3]) > DATUM_API_VAR_MAX_SIZE) break;
+				char var_name[DATUM_API_VAR_MAX_SIZE];
+				for (size_t i = 0; ; ++i) {
+					var_name[i] = toupper(url[4 + i]);
+					if (!var_name[i]) break;
+				}
 				DATUM_API_VarFunc func = datum_api_find_var_func(var_name);
 				if (!func) break;
 				
