@@ -96,21 +96,27 @@ MAKE_API_LLU(DATUM_SHARES_ACCEPTED_ABSOLUTE, datum_accepted_share_count)
 MAKE_API_LLU(DATUM_SHARES_ACCEPTED_WEIGHED, datum_accepted_share_diff)
 MAKE_API_LLU(DATUM_SHARES_REJECTED_ABSOLUTE, datum_rejected_share_count)
 MAKE_API_LLU(DATUM_SHARES_REJECTED_WEIGHED, datum_rejected_share_diff)
-void datum_api_var_DATUM_CONNECTION_STATUS(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
-	const char *colour = "lime";
+void datum_api_var_DATUM_CONNECTION_STATUS_INDICATOR_COLOUR(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
+	const char *colour;
+	if (datum_protocol_is_active() || !datum_config.datum_pool_host[0]) {
+		colour = "lime";
+	} else if (datum_config.datum_pooled_mining_only) {
+		colour = "red";
+	} else {
+		colour = "yellow";
+	}
+	snprintf(buffer, buffer_size, "%s", colour);
+}
+void datum_api_var_DATUM_CONNECTION_STATUS_DESCRIPTION(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	const char *s;
 	if (datum_protocol_is_active()) {
 		s = "Connected and Ready";
 	} else if (datum_config.datum_pooled_mining_only && datum_config.datum_pool_host[0]) {
-		colour = "red";
 		s = "Not Ready";
 	} else {
-		if (datum_config.datum_pool_host[0]) {
-			colour = "yellow";
-		}
 		s = "Non-Pooled Mode";
 	}
-	snprintf(buffer, buffer_size, "<svg viewBox='0 0 100 100' role='img' style='width:1em;height:1em'><circle cx='50' cy='60' r='35' style='fill:%s' /></svg> %s", colour, s);
+	snprintf(buffer, buffer_size, "%s", s);
 }
 void datum_api_var_DATUM_POOL_HOST(char *buffer, size_t buffer_size, const T_DATUM_API_DASH_VARS *vardata) {
 	if (datum_config.datum_pool_host[0]) {
@@ -180,7 +186,8 @@ DATUM_API_VarEntry var_entries[] = {
 	{"DATUM_SHARES_ACCEPTED_WEIGHED", datum_api_var_DATUM_SHARES_ACCEPTED_WEIGHED},
 	{"DATUM_SHARES_REJECTED_ABSOLUTE", datum_api_var_DATUM_SHARES_REJECTED_ABSOLUTE},
 	{"DATUM_SHARES_REJECTED_WEIGHED", datum_api_var_DATUM_SHARES_REJECTED_WEIGHED},
-	{"DATUM_CONNECTION_STATUS", datum_api_var_DATUM_CONNECTION_STATUS},
+	{"DATUM_CONNECTION_STATUS_INDICATOR_COLOUR", datum_api_var_DATUM_CONNECTION_STATUS_INDICATOR_COLOUR},
+	{"DATUM_CONNECTION_STATUS_DESCRIPTION", datum_api_var_DATUM_CONNECTION_STATUS_DESCRIPTION},
 	{"DATUM_POOL_HOST", datum_api_var_DATUM_POOL_HOST},
 	{"DATUM_POOL_TAG", datum_api_var_DATUM_POOL_TAG},
 	{"DATUM_MINER_TAG", datum_api_var_DATUM_MINER_TAG},
