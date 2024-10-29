@@ -16,7 +16,19 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+      
+      - name: Checkout libbase58
+        uses: actions/checkout@v4
+        with:
+          repository: bitcoin/libbase58
+          path: libbase58
+      
+      - name: Checkout libblkmaker
+        uses: actions/checkout@v4
+        with:
+          repository: bitcoin/libblkmaker
+          path: libblkmaker
       
       - name: Create build directory
         run: mkdir -p build
