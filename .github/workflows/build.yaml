@@ -13,6 +13,8 @@ jobs:
         os:
           - ubuntu-latest
           - ubuntu-22.04
+          - macos-latest
+          - macos-13
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -21,10 +23,15 @@ jobs:
 
       - name: Create build directory
         run: mkdir -p build
-        
+
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libjansson-dev libmicrohttpd-dev libsodium-dev
-      
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            brew install coreutils curl jansson libmicrohttpd libsodium
+          else
+            sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libjansson-dev libmicrohttpd-dev libsodium-dev
+          fi
+
       - name: Build DATUM Gateway
         run: |
           cd build
