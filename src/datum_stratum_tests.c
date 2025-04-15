@@ -148,6 +148,107 @@ void datum_stratum_relevant_username_tests() {
 	s = "a%10%b%10%c%10%d%10%e%10%f%10%g%10%h%10%i%10%j%10%k";
 	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0xffff) == buf);
 	assert(!strcmp(buf, "j"));
+	
+	// Test URL-encoded percentages
+	s = "user1%25";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	s = "user1%50%user2%25";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0xffff) == buf);
+	assert(!strcmp(buf, "user2"));
+	
+	// Test with 3 users and URL-encoded percentages
+	s = "user1%50%user2%25%user3%25";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Test with the specific username from the issue
+	s = "bc1qrandomaddress000000000000000000.TESTING%50%bc1qrandomaddress000000000000000001.TESTING%25%bc1qrandomaddress000000000000000002.TESTING2%25";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "bc1qrandomaddress000000000000000000.TESTING"));
+	
+	// Test ambiguous patterns where a sequence could be interpreted as either percentage or URL-encoded character
+	s = "user1%25%75"; // Test case where %25 is a 25% split, not a URL-encoded '%'
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0x7000) == &s[7]); // Verify distribution above 25% threshold
+	
+	// Test the actual format that was reported problematic
+	s = "bc1qrandomaddress000000000000000000.TESTING%25%bc1qrandomaddress000000000000000001.TESTING%75";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "bc1qrandomaddress000000000000000000.TESTING"));
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0x8000) == &s[42]); // Verify distribution above 25% threshold
+	
+	// Test handling of various URL-encoded characters
+	// Test with URL-encoded space character
+	s = "user1%50%user2%20%user3";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Test with URL-encoded ampersand character
+	s = "user1%50%user2%26%user3";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Test edge cases with URL-encoded characters
+	s = "user1%20%user2"; // URL-encoded space at the beginning of potential percentage
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	s = "user1%50%user2%20"; // URL-encoded space at the end of username
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Additional edge cases
+	// Test with very large percentages
+	s = "user1%99.99%user2%0.01";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0xfffe) == &s[12]); // Just below 100%
+	
+	// Test with sequential URL-encoded characters
+	s = "user1%20%20%user2"; // Two URL-encoded spaces in a row
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Test with mixed URL-encoded characters
+	s = "user1%25%20%user2"; // URL-encoded % followed by URL-encoded space
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Test with malformed percentages that should be rejected
+	s = "user1%101%user2"; // Invalid percentage > 100%
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == s);
+	
+	s = "user1%-1%user2"; // Invalid negative percentage
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == s);
+	
+	// Test consecutive percentage delimiters
+	s = "user1%%user2"; // Empty percentage value
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == s);
+	
+	// Test extremely long usernames
+	char long_username[256] = "user1%50%";
+	memset(long_username + 7, 'A', 240);
+	long_username[247] = 0;
+	assert(datum_stratum_relevant_username(long_username, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "user1"));
+	
+	// Test boundary case where share_rnd is exactly at the threshold
+	s = "user1%50%user2%50";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0x7FFF) == buf); // Just below 50%
+	assert(!strcmp(buf, "user1"));
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0x8000) == &s[7]); // Exactly at 50%
+	assert(!strcmp(buf, "user2"));
+	
+	// Test the specific pattern where %20 is a percentage value, not URL-encoded space
+	s = "bc1qrandomaddress000000000000000000.TESTING%20%bc1qrandomaddress000000000000000001.TESTING%80";
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0) == buf);
+	assert(!strcmp(buf, "bc1qrandomaddress000000000000000000.TESTING"));
+	assert(datum_stratum_relevant_username(s, buf, sizeof(buf), 0x5000) == &s[42]); // Verify distribution above 20% threshold
 }
 
 void datum_stratum_tests(void) {

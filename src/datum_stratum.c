@@ -46,6 +46,7 @@
 #include <jansson.h>
 #include <inttypes.h>
 #include <sys/resource.h>
+#include <ctype.h>  // For isdigit()
 
 #include "datum_gateway.h"
 #include "datum_stratum.h"
@@ -58,6 +59,7 @@
 #include "datum_coinbaser.h"
 #include "datum_submitblock.h"
 #include "datum_protocol.h"
+#include "datum_logger.h"
 
 T_DATUM_SOCKET_APP *global_stratum_app = NULL;
 
@@ -961,9 +963,70 @@ const char *datum_stratum_relevant_username(const char *username_s, char * const
 		const char * const percent_pos = strchr(username_s, '%');
 		if (!percent_pos) return username_s;
 		
-		const char *endptr;
+		// Handle ambiguous patterns where a sequence could be either a percentage or URL-encoded character
+		// For example: %25%75 where %25 could be either 25% split or URL-encoded '%' character
+		bool is_percentage_not_urlencoded = false;
+		
+		// Check if this pattern is a percentage followed by another username segment
+		// This detects patterns like "%20%username" where %20 should be treated as 20%, not a URL-encoded space
+		if ((strncmp(percent_pos, "%25", 3) == 0 && percent_pos[3] == '%') ||
+		    (strncmp(percent_pos, "%20", 3) == 0 && percent_pos[3] == '%') ||
+		    (strncmp(percent_pos, "%26", 3) == 0 && percent_pos[3] == '%')) {
+			is_percentage_not_urlencoded = true;
+		}
+		
+		// Also consider any %NN pattern followed by a username as a percentage
+		// This handles patterns like "%20%3PxWT..." where %20 is 20%, not a URL-encoded space
+		if (!is_percentage_not_urlencoded) {
+			// Look for digit patterns that match percentages
+			if (isdigit(percent_pos[1]) && (percent_pos[2] == '%' || (isdigit(percent_pos[2]) && 
+				(percent_pos[3] == '%' || (percent_pos[3] == '.' && isdigit(percent_pos[4])))))) {
+				is_percentage_not_urlencoded = true;
+			}
+		}
+		
+		// Parse the percentage value
+		const char *endptr = NULL;
 		const int per = datum_strtoi_strict_2d2(&percent_pos[1], strlen(&percent_pos[1]), &endptr);
-		if (per < 0) return username_s;
+		
+		// If parsing failed, check if it's a known URL-encoded character
+		if (per < 0) {
+			// Handle common URL-encoded characters when not determined to be a percentage
+			if ((strncmp(percent_pos, "%25", 3) == 0 ||   // '%' character
+			     strncmp(percent_pos, "%20", 3) == 0 ||   // space character
+			     strncmp(percent_pos, "%26", 3) == 0) &&  // ampersand character
+			     !is_percentage_not_urlencoded) {
+				
+				// Extract username portion up to the URL-encoded character
+				snprintf(username_buf, username_buf_sz, "%.*s", (int)(percent_pos - username_s), username_s);
+				return username_buf;
+			}
+			
+			// Not a valid percentage or recognized URL-encoded character
+			return username_s;
+		}
+		
+		// Handle URL-encoded characters that appear after a valid percentage
+		if (*endptr == '%' && endptr[1] && endptr[2] && 
+			((endptr[1] == '2' && (endptr[2] == '5' || endptr[2] == '0' || endptr[2] == '6')))) {
+			
+			// Calculate threshold based on the percentage
+			const uint32_t split_threshold = base + (uint32_t)per * 0x10000 / 10000;
+			
+			// Determine if this is the correct username segment based on share_rnd
+			if (share_rnd < split_threshold || split_threshold + n > 0xffff) {
+				snprintf(username_buf, username_buf_sz, "%.*s", (int)(percent_pos - username_s), username_s);
+				return username_buf;
+			}
+			
+			// Advance to the next username segment
+			username_s = &endptr[3]; // Skip the entire URL-encoded sequence
+			base = split_threshold;
+			++n;
+			continue;
+		}
+		
+		// Validate standard percentage format
 		if (*endptr != '\0' && *endptr != '%') return username_s;
 		
 		const uint32_t split_threshold = base + (uint32_t)per * 0x10000 / 10000;
@@ -972,7 +1035,7 @@ const char *datum_stratum_relevant_username(const char *username_s, char * const
 			return username_buf;
 		}
 		
-		// move on to the next split
+		// Proceed to next username segment
 		if (*endptr == '\0') return datum_config.mining_pool_address;
 		username_s = &endptr[1];
 		base = split_threshold;
