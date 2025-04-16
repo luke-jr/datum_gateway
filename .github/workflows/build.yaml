@@ -13,6 +13,7 @@ jobs:
         os:
           - ubuntu-latest
           - ubuntu-22.04
+          - ubuntu-20.04
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -28,5 +29,5 @@ jobs:
       - name: Build DATUM Gateway
         run: |
           cd build
-          cmake ..
+          cmake .. ${{ matrix.os == 'ubuntu-20.04' && '-DENABLE_API=OFF' || '' }}
           make -j$(nproc)
