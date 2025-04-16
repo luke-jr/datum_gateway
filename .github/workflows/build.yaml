@@ -13,6 +13,10 @@ jobs:
         os:
           - ubuntu-latest
           - ubuntu-22.04
+        cmake_opts:
+          - ''
+          - '-DENABLE_API=OFF'
+
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -28,5 +32,5 @@ jobs:
       - name: Build DATUM Gateway
         run: |
           cd build
-          cmake ..
+          cmake .. ${{ matrix.cmake_opts }}
           make -j$(nproc)
