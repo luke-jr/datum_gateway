@@ -25,8 +25,11 @@ jobs:
           - clearlinux:latest
         config:
           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=gcc"
+            id: "gcc"
           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=clang"
+            id: "clang"
           - cmake_args: "-DENABLE_API=OFF"
+            id: "no_api"
         exclude:
           # Clang configured for C11 rejects our C23 usage
           - os: debian:oldstable
@@ -43,8 +46,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: pkg-cache
-          key: ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ github.sha }}
+          key: ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ matrix.config.id }}-${{ github.sha }}
           restore-keys: |
+            ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ matrix.config.id }}-
             ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-
             ${{ matrix.os }}-pkg-cache-main-
 
@@ -66,24 +70,25 @@ jobs:
           case "${{ matrix.os }}" in
             debian:*|ubuntu:*)
               PKG_CACHE_DIR="/var/cache/apt"
-              INSTALL_CMD="apt update && apt install -y"
+              INSTALL_CMD="apt update && apt-config dump && apt -o Binary::apt::APT::Keep-Downloaded-Packages=1 -o DPkg::Post-Invoke::= install -y"
               PACKAGES="git libc6-dev cmake libcurl4-openssl-dev libjansson-dev libsodium-dev pkgconf"
               PACKAGES_API="libmicrohttpd-dev"
               CLEANUP_CACHE_CMD="rm -rfv ${PKG_CACHE_DIR}/archives/{partial,lock}"
               ;;
             almalinux:*|amazonlinux:*|fedora:*|oraclelinux:*)
               PKG_CACHE_DIR="/var/cache/dnf"
-              INSTALL_CMD="dnf install -y"
-              [[ "${{ matrix.os }}" =~ ^almalinux: ]] && INSTALL_CMD="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled crb && $INSTALL_CMD"
-              [[ "${{ matrix.os }}" =~ ^oraclelinux: ]] && INSTALL_CMD="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled ol9_codeready_builder && $INSTALL_CMD"
-              [[ "${{ matrix.os }}" =~ ^(alma|oracle)linux: ]] && INSTALL_CMD="dnf install -y epel-release && $INSTALL_CMD"
+              DNF_INSTALL="dnf --setopt=keepcache=True install -y"
+              INSTALL_CMD="$DNF_INSTALL"
+              [[ "${{ matrix.os }}" =~ ^almalinux: ]] && INSTALL_CMD="$DNF_INSTALL dnf-plugins-core && dnf config-manager --set-enabled crb && $INSTALL_CMD"
+              [[ "${{ matrix.os }}" =~ ^oraclelinux: ]] && INSTALL_CMD="$DNF_INSTALL dnf-plugins-core && dnf config-manager --set-enabled ol9_codeready_builder && $INSTALL_CMD"
+              [[ "${{ matrix.os }}" =~ ^(alma|oracle)linux: ]] && INSTALL_CMD="$DNF_INSTALL epel-release && $INSTALL_CMD"
               PACKAGES="git cmake libcurl-devel jansson-devel libsodium-devel pkgconf"
               PACKAGES_API="libmicrohttpd-devel"
               [[ "${{ matrix.config.cmake_args }}" =~ clang|gcc ]] || PACKAGES="$PACKAGES gcc"
               ;;
             alpine:*)
               PKG_CACHE_DIR="/var/cache/apk"
-              INSTALL_CMD="apk add"
+              INSTALL_CMD="ln -s /var/cache/apk /etc/apk/cache && apk add"
               PACKAGES="git build-base cmake argp-standalone curl-dev jansson-dev libsodium-dev"
               PACKAGES_API="libmicrohttpd-dev"
               ;;
@@ -95,7 +100,7 @@ jobs:
               ;;
             clearlinux:*)
               PKG_CACHE_DIR="/var/cache/swupd"
-              INSTALL_CMD="swupd bundle-add"
+              INSTALL_CMD="swupd bundle-add --verbose --debug"
               PACKAGES="git c-basic devpkg-curl devpkg-jansson devpkg-libsodium"
               PACKAGES_API="devpkg-libmicrohttpd"
               PACKAGES_CLANG="llvm"
@@ -112,11 +117,12 @@ jobs:
               PACKAGES="$PACKAGES $PACKAGES_CLANG"
           fi
           CMD="set -ex
-            find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true
+            ( find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true; ) | head -n 25
+            chown -R root:root "${PKG_CACHE_DIR}"
             ${INSTALL_CMD} ${PACKAGES}
             ${CLEANUP_CACHE_CMD}
             chmod a+rX -R "${PKG_CACHE_DIR}"
-            find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true
+            ( find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true; ) | head -n 25
             git config --global --add safe.directory /workspace
             mkdir -p build
             cd build
@@ -134,4 +140,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: pkg-cache
-          key: ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ github.sha }}
+          key: ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ matrix.config.id }}-${{ github.sha }}
