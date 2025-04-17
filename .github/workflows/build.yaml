@@ -66,7 +66,7 @@ jobs:
               INSTALL_CMD="apt update && apt install -y"
               PACKAGES="git libc6-dev cmake libcurl4-openssl-dev libjansson-dev libsodium-dev pkgconf"
               PACKAGES_API="libmicrohttpd-dev"
-              CLEANUP_CACHE_CMD='rm -rfv pkg-cache/archives/{partial,lock}'
+              CLEANUP_CACHE_CMD="rm -rfv ${PKG_CACHE_DIR}/archives/{partial,lock}"
               ;;
             almalinux:*|amazonlinux:*|fedora:*|oraclelinux:*)
               PKG_CACHE_DIR="/var/cache/dnf"
@@ -112,6 +112,7 @@ jobs:
             find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true
             ${INSTALL_CMD} ${PACKAGES}
             ${CLEANUP_CACHE_CMD}
+            chmod a+rX -R "${PKG_CACHE_DIR}"
             git config --global --add safe.directory /workspace
             mkdir -p build
             cd build
