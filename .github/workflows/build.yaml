@@ -116,6 +116,7 @@ jobs:
             ${INSTALL_CMD} ${PACKAGES}
             ${CLEANUP_CACHE_CMD}
             chmod a+rX -R "${PKG_CACHE_DIR}"
+            find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true
             git config --global --add safe.directory /workspace
             mkdir -p build
             cd build
