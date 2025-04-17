@@ -23,7 +23,6 @@ jobs:
           - alpine:latest
           - archlinux:latest
           - clearlinux:latest
-          - nixos/nix:latest
         config:
           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=gcc"
           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=clang"
@@ -61,7 +60,6 @@ jobs:
         run: |
           PACKAGES_CLANG='clang'
           PACKAGES_GCC='gcc'
-          SUBSHELL_CMD='sh -c'
           case "${{ matrix.os }}" in
             debian:*|ubuntu:*)
               PKG_CACHE_DIR="/var/cache/apt"
@@ -100,31 +98,6 @@ jobs:
               PACKAGES_CLANG="llvm"
               PACKAGES_GCC=''  # included in c-basic
               ;;
-            nixos/nix:*)
-              PKG_CACHE_DIR='/pkg-cache'  # TODO: actually use this
-              INSTALL_CMD='
-                  install() {
-                      cat > shell.nix <<EOF
-          let
-            pkgs = import <nixpkgs> {};
-          in
-          pkgs.mkShell {
-            buildInputs = with pkgs; [ $@ ];
-          }
-          EOF
-
-                      nix-env -iA $(
-                          for p in "$@"; do
-                              echo "nixpkgs.$p"
-                          done
-                      )
-                  };
-                  install'
-              PACKAGES="cmake gnumake pkgconf curl.dev jansson libsodium"
-              [[ "${{ matrix.config.cmake_args }}" =~ CMAKE_C_COMPILER= ]] || PACKAGES="$PACKAGES gcc"
-              PACKAGES_API="libmicrohttpd"
-              SUBSHELL_CMD='nix-shell --run'
-              ;;
           esac
           PACKAGES="$PACKAGES ${{ matrix.config.extra_deps }}"
           if [[ "${{ matrix.config.cmake_args }}" =~ ENABLE_API=ON ]]; then
@@ -139,13 +112,11 @@ jobs:
             find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true
             ${INSTALL_CMD} ${PACKAGES}
             ${CLEANUP_CACHE_CMD}
-            ${SUBSHELL_CMD} '
-                git config --global --add safe.directory /workspace
-                mkdir -p build
-                cd build
-                cmake /workspace -DCMAKE_C_FLAGS=\"-Wall -Werror\" ${{ matrix.config.cmake_args }}
-                make -j\$(nproc)
-            '
+            git config --global --add safe.directory /workspace
+            mkdir -p build
+            cd build
+            cmake /workspace -DCMAKE_C_FLAGS='-Wall -Werror' ${{ matrix.config.cmake_args }}
+            make -j\$(nproc)
           "
           docker run \
             -v ./pkg-cache:"${PKG_CACHE_DIR}" \
