@@ -39,11 +39,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup package cache
-        uses: actions/cache@v4
+      - name: Load package cache
+        uses: actions/cache/restore@v4
         with:
           path: pkg-cache
-          key: ${{ matrix.os }}-pkg-cache
+          key: ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ github.sha }}
+          restore-keys: |
+            ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-
+            ${{ matrix.os }}-pkg-cache-main-
 
       - name: Initialise Docker image
         run: |
@@ -91,7 +94,7 @@ jobs:
               PACKAGES_API="libmicrohttpd"
               ;;
             clearlinux:*)
-              PKG_CACHE_DIR="/var/lib/swupd"
+              PKG_CACHE_DIR="/var/cache/swupd"
               INSTALL_CMD="swupd bundle-add"
               PACKAGES="git c-basic devpkg-curl devpkg-jansson devpkg-libsodium"
               PACKAGES_API="devpkg-libmicrohttpd"
@@ -124,3 +127,10 @@ jobs:
             -v "${{ github.workspace }}:/workspace":ro \
             "${{ matrix.os }}" \
             /bin/sh -c "${CMD}"
+
+      - name: Save package cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: pkg-cache
+          key: ${{ matrix.os }}-pkg-cache-${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}-${{ github.sha }}
