@@ -45,6 +45,16 @@ jobs:
           path: pkg-cache
           key: ${{ matrix.os }}-pkg-cache
 
+      - name: Initialise Docker image
+        run: |
+          if [ -e pkg-cache/docker.tar ]; then
+              docker load -i pkg-cache/docker.tar
+          else
+              docker pull "${{ matrix.os }}"
+              mkdir -p pkg-cache
+              docker save -o pkg-cache/docker.tar "${{ matrix.os }}"
+          fi
+
       - name: Build inside Docker
         run: |
           PACKAGES_CLANG='clang'
