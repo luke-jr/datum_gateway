@@ -104,8 +104,6 @@ jobs:
               PKG_CACHE_DIR='/pkg-cache'  # TODO: actually use this
               INSTALL_CMD='
                   install() {
-                      local DRV_PATH STORE_PATH HASH NARFILE
-
                       cat > shell.nix <<EOF
           let
             pkgs = import <nixpkgs> {};
@@ -115,28 +113,11 @@ jobs:
           }
           EOF
 
-                      DRV_PATH=$(nix-instantiate shell.nix)
-                      nix-store --query --requisites "$DRV_PATH" > /tmp/store_paths.txt
-                      while read -r STORE_PATH; do
-                        HASH=$(basename "$STORE_PATH" | cut -d- -f1)
-                        NARFILE="/pkg-cache/$HASH.nar"
-                        if [ -e "$NARFILE" ]; then
-                          nix-store --import < "$NARFILE"
-                        else
-                          echo "$STORE_PATH" >> /tmp/missing_nars.txt
-                        fi
-                      done < /tmp/store_paths.txt
-
                       nix-env -iA $(
                           for p in "$@"; do
                               echo "nixpkgs.$p"
                           done
                       )
-
-                      while read -r STORE_PATH; do
-                        HASH=$(basename "$STORE_PATH" | cut -d- -f1)
-                        nix-store --export "$STORE_PATH" > "/pkg-cache/$HASH.nar"
-                      done < /tmp/missing_nars.txt
                   };
                   install'
               PACKAGES="cmake gnumake pkgconf curl.dev jansson libsodium"
