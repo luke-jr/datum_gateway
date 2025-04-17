@@ -55,6 +55,7 @@ jobs:
               mkdir -p pkg-cache
               docker save -o pkg-cache/docker.tar "${{ matrix.os }}"
           fi
+          find pkg-cache
 
       - name: Build inside Docker
         run: |
