@@ -19,6 +19,7 @@ jobs:
           - amazonlinux:latest
           - fedora:latest
           - oraclelinux:9
+          - alpine:latest
           - archlinux:latest
           - clearlinux:latest
         config:
@@ -50,6 +51,11 @@ jobs:
               PACKAGES="git cmake libcurl-devel jansson-devel libsodium-devel pkgconf"
               PACKAGES_API="libmicrohttpd-devel"
               [[ "${{ matrix.config.cmake_args }}" =~ clang|gcc ]] || PACKAGES="$PACKAGES gcc"
+              ;;
+            alpine:*)
+              INSTALL_CMD="apk add --no-cache"
+              PACKAGES="git build-base cmake argp-standalone curl-dev jansson-dev libsodium-dev"
+              PACKAGES_API="libmicrohttpd-dev"
               ;;
             archlinux:*)
               INSTALL_CMD="pacman -Syu --noconfirm"
