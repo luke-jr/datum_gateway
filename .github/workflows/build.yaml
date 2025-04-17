@@ -39,17 +39,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Setup package cache
+        uses: actions/cache@v4
+        with:
+          path: pkg-cache
+          key: ${{ matrix.os }}-pkg-cache
+
       - name: Build inside Docker
         run: |
           PACKAGES_CLANG='clang'
           PACKAGES_GCC='gcc'
           case "${{ matrix.os }}" in
             debian:*|ubuntu:*)
+              PKG_CACHE_DIR="/var/cache/apt"
               INSTALL_CMD="apt update && apt install -y"
               PACKAGES="git libc6-dev cmake libcurl4-openssl-dev libjansson-dev libsodium-dev pkgconf"
               PACKAGES_API="libmicrohttpd-dev"
+              CLEANUP_CACHE_CMD='rm -rfv pkg-cache/archives/{partial,lock}'
               ;;
             almalinux:*|amazonlinux:*|fedora:*|oraclelinux:*)
+              PKG_CACHE_DIR="/var/cache/dnf"
               INSTALL_CMD="dnf install -y"
               [[ "${{ matrix.os }}" =~ ^almalinux: ]] && INSTALL_CMD="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled crb && $INSTALL_CMD"
               [[ "${{ matrix.os }}" =~ ^oraclelinux: ]] && INSTALL_CMD="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled ol9_codeready_builder && $INSTALL_CMD"
@@ -59,16 +68,19 @@ jobs:
               [[ "${{ matrix.config.cmake_args }}" =~ clang|gcc ]] || PACKAGES="$PACKAGES gcc"
               ;;
             alpine:*)
-              INSTALL_CMD="apk add --no-cache"
+              PKG_CACHE_DIR="/var/cache/apk"
+              INSTALL_CMD="apk add"
               PACKAGES="git build-base cmake argp-standalone curl-dev jansson-dev libsodium-dev"
               PACKAGES_API="libmicrohttpd-dev"
               ;;
             archlinux:*)
+              PKG_CACHE_DIR="/var/cache/pacman"
               INSTALL_CMD="pacman -Syu --noconfirm"
               PACKAGES="git base-devel cmake curl jansson libsodium"
               PACKAGES_API="libmicrohttpd"
               ;;
             clearlinux:*)
+              PKG_CACHE_DIR="/var/lib/swupd"
               INSTALL_CMD="swupd bundle-add"
               PACKAGES="git c-basic devpkg-curl devpkg-jansson devpkg-libsodium"
               PACKAGES_API="devpkg-libmicrohttpd"
@@ -87,6 +99,7 @@ jobs:
           fi
           CMD="set -ex
             ${INSTALL_CMD} ${PACKAGES}
+            ${CLEANUP_CACHE_CMD}
             git config --global --add safe.directory /workspace
             mkdir -p build
             cd build
@@ -94,6 +107,7 @@ jobs:
             make -j\$(nproc)
           "
           docker run \
+            -v ./pkg-cache:"${PKG_CACHE_DIR}" \
             -v "${{ github.workspace }}:/workspace":ro \
             "${{ matrix.os }}" \
             /bin/sh -c "${CMD}"
