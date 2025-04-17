@@ -155,7 +155,7 @@ jobs:
               PACKAGES="$PACKAGES $PACKAGES_CLANG"
           fi
           CMD="set -ex
-            find "${PKG_CACHE_DIR}"
+            find "${PKG_CACHE_DIR}" || ls -d "${PKG_CACHE_DIR}"/* || true
             ${INSTALL_CMD} ${PACKAGES}
             ${CLEANUP_CACHE_CMD}
             ${SUBSHELL_CMD} '
