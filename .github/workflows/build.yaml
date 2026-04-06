@@ -32,6 +32,8 @@ jobs:
           - gentoo/stage3:musl-hardened
           - gentoo/stage3:hardened
           - freebsd
+          - freebsd:14.4
+          - freebsd:14.4:aarch64
         config:
           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=gcc"
           - cmake_args: "-DENABLE_API=ON -DCMAKE_C_COMPILER=clang"
@@ -190,6 +192,8 @@ jobs:
         if: startsWith(matrix.os, 'freebsd')
         uses: vmactions/freebsd-vm@v1
         with:
+          release: ${{ matrix.os == 'freebsd' && null || split(matrix.os, ':')[1] }}
+          arch: ${{ contains(matrix.os, ':aarch64') && 'aarch64' || null }}
           prepare: |
             PACKAGES="git cmake pkgconf curl jansson libsodium libmicrohttpd argp-standalone libepoll-shim" 
             if echo "${{ matrix.config.cmake_args }}" | grep -q "CMAKE_C_COMPILER=gcc"; then
