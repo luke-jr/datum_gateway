@@ -157,25 +157,22 @@ int datum_logger_queue_msg(const char *func, int level, const char *format, ...)
 	// Add the msg to the logger queue
 	// this is probably overkill...
 	for (i=0;i<10000000;i++) {
-		if (i < 99999990) { // ensure we don't get the lock on the last try and forget to unlock and crash
-			// get the active buffer ID
-			pthread_rwlock_rdlock(&dlog_active_buffer_rwlock);
-			buffer_id = dlog_active_buffer;
-			buffer_version = dlog_active_buffer_version;
-			pthread_rwlock_unlock(&dlog_active_buffer_rwlock);
-			
-			// get a write lock for that buffer
-			pthread_rwlock_wrlock(&dlog_buffer_rwlock[buffer_id]);
-			
-			// check for race condition on buffer swap
-			if (buffer_version != dlog_queue_version[buffer_id]) {
-				// Race condition!
-				pthread_rwlock_unlock(&dlog_buffer_rwlock[buffer_id]);
-			} else {
-				// no race condition, we're good
-				break;
-			}
+		// get the active buffer ID
+		pthread_rwlock_rdlock(&dlog_active_buffer_rwlock);
+		buffer_id = dlog_active_buffer;
+		buffer_version = dlog_active_buffer_version;
+		pthread_rwlock_unlock(&dlog_active_buffer_rwlock);
+		
+		// get a write lock for that buffer
+		pthread_rwlock_wrlock(&dlog_buffer_rwlock[buffer_id]);
+		
+		// check for race condition on buffer swap
+		if (buffer_version == dlog_queue_version[buffer_id]) {
+			// no race condition, we're good
+			break;
 		}
+		// Race condition! release and retry.
+		pthread_rwlock_unlock(&dlog_buffer_rwlock[buffer_id]);
 	}
 	
 	if (i >= 10000000) {

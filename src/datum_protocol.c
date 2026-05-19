@@ -1018,10 +1018,11 @@ int datum_protocol_send_hello(int sockfd) {
 	hello_msg[i] = 0xFE; i++;
 	
 	// pick our initial sending_header_key
-	hello_msg[i] = rand(); i++;
-	hello_msg[i] = rand(); i++;
-	hello_msg[i] = rand(); i++;
-	hello_msg[i] = rand(); i++;
+	// Use cryptographic randomness for the 4-byte seed. The peer re-derives the
+	// nonce from these wire bytes via datum_header_xor_feedback(), so improving
+	// the seed entropy does not affect protocol compatibility.
+	randombytes_buf(&hello_msg[i], 4);
+	i += 4;
 	
 	nk = upk_u32le(hello_msg, i - 4);
 	
@@ -1386,6 +1387,13 @@ int datum_protocol_pow(void *arg) {
 		pthread_rwlock_unlock(&datum_jobs_rwlock);
 		pthread_rwlock_wrlock(&datum_jobs_rwlock);
 		w = true;
+		T_DATUM_STRATUM_JOB * const locked_sjob = datum_jobs[pow->datum_job_id].sjob;
+		if (!locked_sjob || locked_sjob != sjob) {
+			DLOG_DEBUG("Discarding POW submit for datum job %d: job recycled during rwlock upgrade", pow->datum_job_id);
+			pthread_rwlock_unlock(&datum_jobs_rwlock);
+			return 0;
+		}
+		sjob = locked_sjob;
 		datum_jobs[pow->datum_job_id].server_has_merkle_branches = true;
 	}
 	
@@ -1404,6 +1412,13 @@ int datum_protocol_pow(void *arg) {
 				pthread_rwlock_unlock(&datum_jobs_rwlock);
 				pthread_rwlock_wrlock(&datum_jobs_rwlock);
 				w = true;
+				T_DATUM_STRATUM_JOB * const locked_sjob = datum_jobs[pow->datum_job_id].sjob;
+				if (!locked_sjob || locked_sjob != sjob) {
+					DLOG_DEBUG("Discarding POW submit for datum job %d: job recycled during rwlock upgrade", pow->datum_job_id);
+					pthread_rwlock_unlock(&datum_jobs_rwlock);
+					return 0;
+				}
+				sjob = locked_sjob;
 			}
 			
 			datum_jobs[pow->datum_job_id].server_has_coinbase_empty = true;
@@ -1423,6 +1438,13 @@ int datum_protocol_pow(void *arg) {
 				pthread_rwlock_unlock(&datum_jobs_rwlock);
 				pthread_rwlock_wrlock(&datum_jobs_rwlock);
 				w = true;
+				T_DATUM_STRATUM_JOB * const locked_sjob = datum_jobs[pow->datum_job_id].sjob;
+				if (!locked_sjob || locked_sjob != sjob) {
+					DLOG_DEBUG("Discarding POW submit for datum job %d: job recycled during rwlock upgrade", pow->datum_job_id);
+					pthread_rwlock_unlock(&datum_jobs_rwlock);
+					return 0;
+				}
+				sjob = locked_sjob;
 			}
 			
 			datum_jobs[pow->datum_job_id].server_has_coinbase[pow->coinbase_id] = true;

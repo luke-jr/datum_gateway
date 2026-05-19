@@ -131,26 +131,22 @@ int datum_queue_add_item(DATUM_QUEUE *q, void *item) {
 	// Add the msg to the logger queue
 	// this is probably overkill...
 	for (i=0;i<10000000;i++) {
-		if (i < 9999999) { // ensure we don't get the lock on the last try and forget to unlock and crash
-			
-			// get the active buffer ID
-			pthread_rwlock_rdlock(&q->active_buffer_rwlock);
-			buffer_id = q->active_buffer;
-			buffer_version = q->active_buffer_version;
-			pthread_rwlock_unlock(&q->active_buffer_rwlock);
-			
-			// get a write lock for that buffer
-			pthread_rwlock_wrlock(&q->buffer_rwlock[buffer_id]);
-			
-			// check for race condition on buffer swap
-			if (buffer_version != q->queue_version[buffer_id]) {
-				// Race condition!
-				pthread_rwlock_unlock(&q->buffer_rwlock[buffer_id]);
-			} else {
-				// no race condition, we're good
-				break;
-			}
+		// get the active buffer ID
+		pthread_rwlock_rdlock(&q->active_buffer_rwlock);
+		buffer_id = q->active_buffer;
+		buffer_version = q->active_buffer_version;
+		pthread_rwlock_unlock(&q->active_buffer_rwlock);
+		
+		// get a write lock for that buffer
+		pthread_rwlock_wrlock(&q->buffer_rwlock[buffer_id]);
+		
+		// check for race condition on buffer swap
+		if (buffer_version == q->queue_version[buffer_id]) {
+			// no race condition, we're good
+			break;
 		}
+		// Race condition! release and retry.
+		pthread_rwlock_unlock(&q->buffer_rwlock[buffer_id]);
 	}
 	
 	if (i >= 10000000) {
