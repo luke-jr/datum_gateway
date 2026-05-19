@@ -1495,7 +1495,10 @@ int datum_api_config_post(struct MHD_Connection * const connection, char * const
 		DLOG_INFO("Config change requires restarting gateway, proceeding");
 		struct MHD_Daemon * const mhd = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_DAEMON)->daemon;
 		pthread_t pthread_datum_restart_thread;
-		pthread_create(&pthread_datum_restart_thread, NULL, datum_restart_thread, mhd);
+		const int result = pthread_create(&pthread_datum_restart_thread, NULL, datum_restart_thread, mhd);
+		if (0 != result) {
+			DLOG_ERROR("Failed to create restart thread (%d). Some changes have not taken effect", result);
+		}
 	}
 	
 	return ret;
