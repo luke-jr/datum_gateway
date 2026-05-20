@@ -94,9 +94,6 @@ typedef struct T_DATUM_PROTOCOL_JOB {
 	
 	atomic_bool server_has_coinbase[8];
 	atomic_bool server_has_coinbase_empty;
-	bool server_has_short_txnlist;
-	
-	bool server_has_validated_block;
 } T_DATUM_PROTOCOL_JOB;
 
 typedef struct {

@@ -1451,8 +1451,6 @@ void *datum_protocol_client(void *args) {
 	for(i=0;i<MAX_DATUM_PROTOCOL_JOBS;i++) {
 		atomic_store_explicit(&datum_jobs[i].server_has_merkle_branches, false, memory_order_relaxed);
 		atomic_store_explicit(&datum_jobs[i].server_has_coinbase_empty, false, memory_order_relaxed);
-		datum_jobs[i].server_has_short_txnlist = false;
-		datum_jobs[i].server_has_validated_block = false;
 		for(n=0;n<8;n++) {
 			atomic_store_explicit(&datum_jobs[i].server_has_coinbase[n], false, memory_order_relaxed);
 		}
