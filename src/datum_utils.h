@@ -95,9 +95,6 @@ uint64_t roundDownToPowerOfTwo_64(uint64_t x) {
 
 static inline
 unsigned char floorPoT(uint64_t x) {
-	if (x == 0) {
-		return 0;
-	}
 	return stdc_bit_width(x) - 1;
 }
 #elif defined(__GNUC__)
@@ -109,10 +106,6 @@ uint64_t roundDownToPowerOfTwo_64(uint64_t x) {
 
 static inline
 unsigned char floorPoT(uint64_t x) {
-	if (x == 0) {
-		return 0;
-	}
-	
 	return (63 - __builtin_clzll(x));
 }
 
@@ -131,10 +124,6 @@ uint64_t roundDownToPowerOfTwo_64(uint64_t x) {
 
 static inline
 unsigned char floorPoT(uint64_t x) {
-	if (x == 0) {
-		return 0;
-	}
-	
 	unsigned char pos = 0;
 	while (x >>= 1) {
 		pos++;
