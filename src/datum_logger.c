@@ -434,7 +434,12 @@ void * datum_logger_thread(void *ptr) {
 int datum_logger_init(void) {
 	pthread_t pthread_datum_logger_thread;
 	
-	pthread_create(&pthread_datum_logger_thread, NULL, datum_logger_thread, NULL);
+	const int result = pthread_create(&pthread_datum_logger_thread, NULL, datum_logger_thread, NULL);
+	if (0 != result) {
+		fprintf(stderr, "datum_coinbaser_init: pthread_create failed with code %d", result);
+		fflush(stderr);
+		return -1;
+	}
 	
 	return 0;
 }

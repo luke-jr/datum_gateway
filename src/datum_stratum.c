@@ -219,7 +219,10 @@ void *datum_stratum_v1_socket_server(void *arg) {
 	
 	// Backup thread for submitting blocks found to our node and additional nodes.
 	DLOG_DEBUG("Starting submitblock thread");
-	datum_submitblock_init();
+	if (0 != datum_submitblock_init()) {
+		panic_from_thread(__LINE__);
+		return NULL;
+	}
 	
 	pthread_rwlock_rdlock(&stratum_global_job_ptr_lock);
 	i = global_latest_stratum_job_index;
