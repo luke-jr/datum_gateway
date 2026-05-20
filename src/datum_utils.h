@@ -40,6 +40,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #ifdef __has_include
+#	if __has_include(<stdbit.h>)
+#		include <stdbit.h>
+#	endif
 #	if __has_include(<stdckdint.h>)
 #		include <stdckdint.h>
 #	endif
@@ -83,7 +86,21 @@ void hex_to_bin(const char *hex, unsigned char *bin);
 void hash2hex(unsigned char *bytes, char *hexString);
 void get_target_from_diff(unsigned char *result, uint64_t diff);
 
-#ifdef __GNUC__
+#if defined(stdc_bit_floor) && defined(stdc_bit_width)
+// standard C23 (but converting arg to 64-bit)
+static inline
+uint64_t roundDownToPowerOfTwo_64(uint64_t x) {
+	return stdc_bit_floor(x);
+}
+
+static inline
+unsigned char floorPoT(uint64_t x) {
+	if (x == 0) {
+		return 0;
+	}
+	return stdc_bit_width(x) - 1;
+}
+#elif defined(__GNUC__)
 // faster, less portable
 static inline
 uint64_t roundDownToPowerOfTwo_64(uint64_t x) {
