@@ -1497,7 +1497,7 @@ int datum_api_config_post(struct MHD_Connection * const connection, char * const
 		pthread_t pthread_datum_restart_thread;
 		const int result = pthread_create(&pthread_datum_restart_thread, NULL, datum_restart_thread, mhd);
 		if (0 != result) {
-			DLOG_ERROR("Failed to create restart thread (%d). Some changes have not taken effect", result);
+			DLOG_ERROR("Failed to create restart thread (%d: %s). Some changes have not taken effect", result, strerror(result));
 		}
 	}
 	
