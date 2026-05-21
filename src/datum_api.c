@@ -1198,7 +1198,7 @@ int datum_api_init(void) {
 	}
 	const int result = pthread_create(&pthread_datum_api_thread, NULL, datum_api_thread, NULL);
 	if (0 != result) {
-		DLOG_ERROR("%s: pthread_create failed with code %d", __func__, result);
+		DLOG_ERROR("%s: pthread_create failed with code %d (%s)", __func__, result, strerror(result));
 		return -1;
 	}
 	

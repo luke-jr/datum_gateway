@@ -178,7 +178,7 @@ int datum_submitblock_init(void) {
 	pthread_t pthread_datum_submitblock_thread;
 	const int result = pthread_create(&pthread_datum_submitblock_thread, NULL, datum_submitblock_thread, NULL);
 	if (0 != result) {
-		DLOG_FATAL("pthread_create for block submission thread failed with code %d", result);
+		DLOG_FATAL("pthread_create for block submission thread failed with code %d (%s)", result, strerror(result));
 		return -1;
 	}
 	return 0;

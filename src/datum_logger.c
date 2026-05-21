@@ -436,7 +436,7 @@ int datum_logger_init(void) {
 	
 	const int result = pthread_create(&pthread_datum_logger_thread, NULL, datum_logger_thread, NULL);
 	if (0 != result) {
-		fprintf(stderr, "%s: pthread_create failed with code %d", __func__, result);
+		fprintf(stderr, "%s: pthread_create failed with code %d (%s)", __func__, result, strerror(result));
 		fflush(stderr);
 		return -1;
 	}

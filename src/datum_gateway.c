@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
 	{
 		const int result = pthread_create(&pthread_datum_gateway_template, NULL, datum_gateway_template_thread, NULL);
 		if (0 != result) {
-			DLOG_FATAL("pthread_create for template fetcher thread failed with code %d", result);
+			DLOG_FATAL("pthread_create for template fetcher thread failed with code %d (%s)", result, strerror(result));
 			usleep(100000);
 			exit(1);
 		}
@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
 	{
 		const int result = pthread_create(&pthread_datum_stratum_v1, NULL, datum_stratum_v1_socket_server, NULL);
 		if (0 != result) {
-			DLOG_FATAL("pthread_create for Stratum v1 server thread failed with code %d", result);
+			DLOG_FATAL("pthread_create for Stratum v1 server thread failed with code %d (%s)", result, strerror(result));
 			usleep(100000);
 			exit(1);
 		}
