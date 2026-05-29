@@ -46,6 +46,7 @@
 #include <curl/curl.h>
 #include <jansson.h>
 
+#include "datum_blocktemplates.h"
 #include "datum_conf.h"
 #include "datum_gateway.h"
 #include "datum_logger.h"
@@ -151,7 +152,7 @@ void datum_rsk_disconnect(struct datum_rsk_state * const state) {
 }
 
 static
-void datum_rsk_handle_message(struct datum_rsk_state * const state) {
+void datum_rsk_handle_message(const global_config_t * const cfg, struct datum_rsk_state * const state) {
 	const json_t *j;
 	json_error_t jerr;
 	const json_t * const jmsg = json_loadb(state->recv_buf.buf, state->recv_buf.len, 0, &jerr);
@@ -189,6 +190,11 @@ void datum_rsk_handle_message(struct datum_rsk_state * const state) {
 			return;
 		}
 		
+		if (0 == memcmp(rsk_commitment_hex_unterminated, pow_hash_hex, RSK_COMMITMENT_SIZE)) {
+			// No change
+			return;
+		}
+		
 		const json_t * const j_target = json_array_get(j, 2);
 		uint8_t rsk_target_new[RSK_TARGET_SIZE];
 		if (!hex_to_bin_checked(json_string_value(j_target), rsk_target_new)) {
@@ -200,11 +206,25 @@ void datum_rsk_handle_message(struct datum_rsk_state * const state) {
 		memcpy(rsk_commitment_hex_unterminated, pow_hash_hex, RSK_COMMITMENT_SIZE);
 		memcpy(rsk_target, rsk_target_new, RSK_TARGET_SIZE);
 		pthread_rwlock_unlock(&rsk_commitment_rwlock);
+		
+		if (!cfg->rsk_update_job) {
+			return;
+		}
+		
+		T_DATUM_TEMPLATE_DATA *tmpl = NULL;
+		int sjob_index;
+		pthread_rwlock_rdlock(&stratum_global_job_ptr_lock);
+		sjob_index = global_latest_stratum_job_index;
+		if (sjob_index >= 0 && sjob_index < MAX_STRATUM_JOBS) {
+			tmpl = global_cur_stratum_jobs[sjob_index]->block_template;
+		}
+		pthread_rwlock_unlock(&stratum_global_job_ptr_lock);
+		update_stratum_job(tmpl, /*new_block=*/ false, JOB_STATE_FULL_PRIORITY_WAIT_COINBASER);
 	}
 }
 
 static
-bool datum_rsk_handle_recv(struct datum_rsk_state * const state) {
+bool datum_rsk_handle_recv(const global_config_t * const cfg, struct datum_rsk_state * const state) {
 	CURLcode cresult;
 	
 	size_t rlen;
@@ -220,7 +240,7 @@ bool datum_rsk_handle_recv(struct datum_rsk_state * const state) {
 	assert(rlen < DATUM_RSK_RECV_BUF_SIZE - state->recv_buf.len);
 	state->recv_buf.len += rlen;
 	if (meta->bytesleft == 0) {
-		datum_rsk_handle_message(state);
+		datum_rsk_handle_message(cfg, state);
 	} else if (meta->bytesleft > DATUM_RSK_RECV_BUF_SIZE - state->recv_buf.len) {
 		DLOG_ERROR("%s: receive buffer overflow (%zu bytes in %zu-byte buffer, %llu bytes remaining)", __func__, (size_t)state->recv_buf.len, (size_t)DATUM_RSK_RECV_BUF_SIZE, (unsigned long long)meta->bytesleft);
 		datum_rsk_disconnect(state);
@@ -342,7 +362,7 @@ void datum_rsk_process(const global_config_t * const cfg, struct datum_rsk_state
 	}
 	
 	if (state->curl) {
-		if (datum_rsk_handle_recv(state)) {
+		if (datum_rsk_handle_recv(cfg, state)) {
 			if (state->send_buf.len == 0) {
 				datum_queue_process(&rsk_block_queue);
 			}

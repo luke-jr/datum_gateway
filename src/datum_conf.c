@@ -83,6 +83,8 @@ const T_DATUM_CONFIG_ITEM datum_config_options[] = {
 		.required = false, .ptr = datum_config.rsk_wsurl, .max_string_len = sizeof(datum_config.rsk_wsurl) },
 	{ .var_type = DATUM_CONF_INT,	 	.category = "rsk", 			.name = "work_update_seconds",		.description = "How many seconds between normal work updates?  (1-120, 2 suggested)",
 		.required = false, .ptr = &datum_config.rsk_work_update_seconds, .default_int = 2 },
+	{ .var_type = DATUM_CONF_BOOL,	 	.category = "rsk",		 	.name = "update_job",					.description = "Push a new job to miners as soon as every new Rootstock block is found.",
+		.required = false, .ptr = &datum_config.rsk_update_job, .default_bool = false },
 	
 	// stratum v1 server configs
 	{ .var_type = DATUM_CONF_STRING, 	.category = "stratum", 		.name = "listen_addr",					.description = "IP address to listen for Stratum Gateway connections",

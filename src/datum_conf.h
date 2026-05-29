@@ -107,6 +107,7 @@ typedef struct {
 	
 	char rsk_wsurl[256];
 	int rsk_work_update_seconds;
+	bool rsk_update_job;
 	
 	char stratum_v1_listen_addr[128];
 	int stratum_v1_listen_port;
