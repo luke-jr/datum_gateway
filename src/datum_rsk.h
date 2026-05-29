@@ -38,6 +38,8 @@
 
 #include "datum_conf.h"
 
+struct T_DATUM_STRATUM_JOB;  // datum_stratum.h includes us, so it would be recursive
+
 #define RSK_COMMITMENT_SIZE 0x20
 #define RSK_TARGET_SIZE 0x20
 
@@ -47,5 +49,6 @@
 
 bool datum_rsk_init(const global_config_t *cfg);
 void datum_rsk_get_current_work(char *out_rsk_commitment_hex_unterminated, uint8_t *out_target);
+int datum_rsk_pow_submit(const struct T_DATUM_STRATUM_JOB *job, const unsigned char *block_header, const unsigned char *full_cb_txn, size_t full_cb_txn_len);
 
 #endif

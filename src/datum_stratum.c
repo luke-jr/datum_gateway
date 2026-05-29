@@ -1264,6 +1264,10 @@ int client_mining_submit(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj
 		}
 	}
 	
+	if (job->rsk_commitment_hex_unterminated[0] && compare_hashes(share_hash, job->rsk_block_target) <= 0 && coinbase_index != 1 /* "nicehash" */) {
+		datum_rsk_pow_submit(job, block_header, full_cb_txn, full_cb_txn_len);
+	}
+	
 	// we check this after checking if the share is a valid block because... well, we want to try and build on our own block even on the off chance it's late.
 	// we'll still reject the share, though, even if it's a block. *trollface*
 	if (job->is_stale_prevblock) {

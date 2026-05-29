@@ -214,6 +214,7 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 	
 	// We exclude Rootstock from "nicehash" templates to ensure we generate enough outputs
 	// TODO: If there's few enough outputs anyway (quite unlikely), we could add it back in
+	// CAUTION: If nicehash is enabled here, datum_stratum.c:client_mining_submit needs to be updated to submit too
 	const bool include_rsk = s->rsk_commitment_hex_unterminated[0] && remaining_size > 500;
 	if (include_rsk) {
 		remaining_size -= RSK_COMMITMENT_OVERHEAD_SIZE + RSK_COMMITMENT_SIZE;

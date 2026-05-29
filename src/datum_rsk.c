@@ -39,6 +39,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -46,22 +47,43 @@
 #include <jansson.h>
 
 #include "datum_conf.h"
+#include "datum_gateway.h"
 #include "datum_logger.h"
+#include "datum_queue.h"
 #include "datum_rsk.h"
+#include "datum_stratum.h"
 #include "datum_utils.h"
 
 pthread_rwlock_t rsk_commitment_rwlock = PTHREAD_RWLOCK_INITIALIZER;
 static char rsk_commitment_hex_unterminated[RSK_COMMITMENT_SIZE * 2];
 static uint8_t rsk_target[RSK_TARGET_SIZE];
 
-// NOTE: datum_rsk_buf uses unsigned int lengths because this is < 2^16
-#define DATUM_RSK_BUF_SZ  0x200
+static DATUM_QUEUE rsk_block_queue;
 
-struct datum_rsk_buf {
-	unsigned int offset;
-	unsigned int len;
-	uint8_t buf[DATUM_RSK_BUF_SZ];
+struct datum_rsk_pow {
+	char rsk_commitment_hex_unterminated[RSK_COMMITMENT_SIZE * 2];
+	uint8_t block_header[80];
+	uint8_t full_cb_txn[MAX_COINBASE_TXN_SIZE_BYTES];
+	size_t full_cb_txn_len;
+	char merklebranches_hex_for_rsk[24 * 65];
+	size_t merklebranches_hex_for_rsk_len;
+	uint32_t block_txn_count;
 };
+
+#define DATUM_RSK_RECV_BUF_SIZE 0x200
+#define DATUM_RSK_SEND_BUF_SIZE (0  \
+	+ 82 /* prefix */  \
+	+ (RSK_COMMITMENT_SIZE * 2) \
+	+ 3 \
+	+ (80 * 2) /* block header */ \
+	+ 3 \
+	+ (MAX_COINBASE_TXN_SIZE_BYTES * 2) \
+	+ 3 \
+	+ ((MAX_MERKLE_BRANCHES * 0x41) - 1) \
+	+ 3 \
+	+ 4 /* hex number of transactions */ \
+	+ 2 /* suffix */ \
+)
 
 struct datum_rsk_state {
 	CURLM *curlm;
@@ -69,9 +91,18 @@ struct datum_rsk_state {
 	char curl_error[CURL_ERROR_SIZE];
 	bool standoff;
 	uint64_t next_update_mono_ms;
-	struct datum_rsk_buf recv_buf;
-	struct datum_rsk_buf send_buf;
+	struct {
+		unsigned int len;
+		char buf[DATUM_RSK_RECV_BUF_SIZE];
+	} recv_buf;
+	struct {
+		unsigned int offset;
+		unsigned int len;
+		char buf[DATUM_RSK_SEND_BUF_SIZE];
+	} send_buf;
 };
+
+static struct datum_rsk_state *g_rsk_state;
 
 #define DATUM_RSK_CURL_ERROR_FMT " (error=%llu %s%s%s)"
 #define DATUM_RSK_CURL_ERROR_VARS_C (unsigned long long)cresult, curl_easy_strerror(cresult), state->curl_error[0] ? ": " : "", state->curl_error
@@ -123,7 +154,7 @@ static
 void datum_rsk_handle_message(struct datum_rsk_state * const state) {
 	const json_t *j;
 	json_error_t jerr;
-	const json_t * const jmsg = json_loadb((char*)state->recv_buf.buf, state->recv_buf.len, 0, &jerr);
+	const json_t * const jmsg = json_loadb(state->recv_buf.buf, state->recv_buf.len, 0, &jerr);
 	if (!jmsg) {
 		DLOG_ERROR("%s: json_loadb failed (error=%s)", __func__, jerr.text);
 		datum_rsk_disconnect(state);
@@ -178,7 +209,7 @@ bool datum_rsk_handle_recv(struct datum_rsk_state * const state) {
 	
 	size_t rlen;
 	const struct curl_ws_frame *meta;
-	cresult = curl_ws_recv(state->curl, &state->recv_buf.buf[state->recv_buf.len], DATUM_RSK_BUF_SZ - state->recv_buf.len, &rlen, &meta);
+	cresult = curl_ws_recv(state->curl, &state->recv_buf.buf[state->recv_buf.len], DATUM_RSK_RECV_BUF_SIZE - state->recv_buf.len, &rlen, &meta);
 	if (cresult != CURLE_OK) {
 		if (cresult == CURLE_AGAIN) return true;
 		
@@ -186,12 +217,12 @@ bool datum_rsk_handle_recv(struct datum_rsk_state * const state) {
 		return false;
 	}
 	
-	assert(rlen < DATUM_RSK_BUF_SZ - state->recv_buf.len);
+	assert(rlen < DATUM_RSK_RECV_BUF_SIZE - state->recv_buf.len);
 	state->recv_buf.len += rlen;
 	if (meta->bytesleft == 0) {
 		datum_rsk_handle_message(state);
-	} else if (meta->bytesleft > DATUM_RSK_BUF_SZ - state->recv_buf.len) {
-		DLOG_ERROR("%s: receive buffer overflow (%zu bytes in %zu-byte buffer, %llu bytes remaining)", __func__, (size_t)state->recv_buf.len, (size_t)DATUM_RSK_BUF_SZ, (unsigned long long)meta->bytesleft);
+	} else if (meta->bytesleft > DATUM_RSK_RECV_BUF_SIZE - state->recv_buf.len) {
+		DLOG_ERROR("%s: receive buffer overflow (%zu bytes in %zu-byte buffer, %llu bytes remaining)", __func__, (size_t)state->recv_buf.len, (size_t)DATUM_RSK_RECV_BUF_SIZE, (unsigned long long)meta->bytesleft);
 		datum_rsk_disconnect(state);
 		return false;
 	}
@@ -236,11 +267,38 @@ void datum_rsk_wait(struct datum_rsk_state * const state, int timeout_ms) {
 // CAUTION: Overwrites any previous queued send! Websocket is packet-based, so we can only send one at a time.
 static inline
 void datum_rsk_queue_send(struct datum_rsk_state * const state, const char * const msg, const size_t msg_len) {
-	assert(msg_len <= DATUM_RSK_BUF_SZ);
-	static_assert(DATUM_RSK_BUF_SZ < UINT_MAX);
+	assert(msg_len <= DATUM_RSK_SEND_BUF_SIZE);
+	static_assert(DATUM_RSK_SEND_BUF_SIZE < UINT_MAX);
 	state->send_buf.offset = 0;
 	state->send_buf.len = (unsigned int)msg_len;
 	memcpy(state->send_buf.buf, msg, msg_len);
+}
+
+static inline
+int datum_rsk_pow_handler(void * const p) {
+	struct datum_rsk_pow * const pow = p;
+	assert(g_rsk_state->send_buf.len == 0);
+	
+	static const char pre[] = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"mnr_submitBitcoinBlockPartialMerkle\",\"params\":[\"";
+	char * const buf = g_rsk_state->send_buf.buf;
+	size_t pos = 0;
+	memcpy(&buf[pos], pre, sizeof(pre) - 1); pos += sizeof(pre) - 1;
+	memcpy(&buf[pos], pow->rsk_commitment_hex_unterminated, RSK_COMMITMENT_SIZE * 2); pos += RSK_COMMITMENT_SIZE * 2;
+	strcpy(&buf[pos], "\",\""); pos += 3;
+	bin2hex(&buf[pos], pow->block_header, 80, /*terminate=*/ false); pos += 80 * 2;
+	strcpy(&buf[pos], "\",\""); pos += 3;
+	bin2hex(&buf[pos], pow->full_cb_txn, pow->full_cb_txn_len, /*terminate=*/ false); pos += pow->full_cb_txn_len * 2;
+	strcpy(&buf[pos], "\",\""); pos += 3;
+	memcpy(&buf[pos], pow->merklebranches_hex_for_rsk, pow->merklebranches_hex_for_rsk_len); pos += pow->merklebranches_hex_for_rsk_len;
+	strcpy(&buf[pos], "\",\""); pos += 3;
+	pos += (unsigned long)sprintf(&buf[pos], "%lu]}", (unsigned long)pow->block_txn_count);
+	
+	assert(pos <= DATUM_RSK_SEND_BUF_SIZE);  // we're in trouble already if not!
+	static_assert(DATUM_RSK_SEND_BUF_SIZE < UINT_MAX);
+	g_rsk_state->send_buf.offset = 0;
+	g_rsk_state->send_buf.len = (unsigned int)pos;
+	
+	return 0;
 }
 
 static
@@ -286,6 +344,9 @@ void datum_rsk_process(const global_config_t * const cfg, struct datum_rsk_state
 	if (state->curl) {
 		if (datum_rsk_handle_recv(state)) {
 			if (state->send_buf.len == 0) {
+				datum_queue_process(&rsk_block_queue);
+			}
+			if (state->send_buf.len == 0) {
 				const uint64_t now_mono_ms = monotonic_time_millis();
 				if (now_mono_ms >= state->next_update_mono_ms) {
 					static const char getwork_req[] = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"mnr_getWork\",\"params\":[]}";
@@ -313,17 +374,22 @@ static
 void *datum_rsk_thread(void * const p) {
 	const global_config_t * const cfg = p;
 	
-	struct datum_rsk_state state = {
-		.curlm = curl_multi_init(),
-	};
-	if (!state.curlm) {
+	if (datum_queue_prep(&rsk_block_queue, /*max_items=*/ 4, sizeof(struct datum_rsk_pow), datum_rsk_pow_handler) != 0) {
+		DLOG_ERROR("%s: Could not setup work submission queue! Rootstock functionality disabled", __func__);
+		return NULL;
+	}
+	
+	g_rsk_state = calloc(1, sizeof(*g_rsk_state));
+	struct datum_rsk_state * const state = g_rsk_state;
+	state->curlm = curl_multi_init();
+	if (!state->curlm) {
 		DLOG_ERROR("%s: curl_multi_init failed; Rootstock functionality disabled", __func__);
 		return NULL;
 	}
 	
 	while (1) {
-		datum_rsk_process(cfg, &state);
-		datum_rsk_wait(&state, INT_MAX);
+		datum_rsk_process(cfg, state);
+		datum_rsk_wait(state, INT_MAX);
 	}
 }
 
@@ -344,4 +410,30 @@ void datum_rsk_get_current_work(char * const out_rsk_commitment_hex_unterminated
 	memcpy(out_rsk_commitment_hex_unterminated, rsk_commitment_hex_unterminated, RSK_COMMITMENT_SIZE);
 	memcpy(out_target, rsk_target, RSK_TARGET_SIZE);
 	pthread_rwlock_unlock(&rsk_commitment_rwlock);
+}
+
+int datum_rsk_pow_submit(const T_DATUM_STRATUM_JOB * const job, const unsigned char * const block_header, const unsigned char * const full_cb_txn, const size_t full_cb_txn_len) {
+	CURLMcode mresult;
+	struct datum_rsk_pow pow;
+	
+	memcpy(pow.rsk_commitment_hex_unterminated, job->rsk_commitment_hex_unterminated, RSK_COMMITMENT_SIZE * 2);
+	memcpy(pow.block_header, block_header, 80);
+	memcpy(pow.full_cb_txn, full_cb_txn, full_cb_txn_len);
+	pow.full_cb_txn_len = full_cb_txn_len;
+	for (unsigned char i = 0; i < job->merklebranch_count; ++i) {
+		memcpy(&pow.merklebranches_hex_for_rsk[i * 0x41], job->merklebranches_hex[i], 0x40);
+		pow.merklebranches_hex_for_rsk[(i * 0x41) + 0x40] = (i == job->merklebranch_count - 1) ? '\0' : ' ';
+	}
+	pow.merklebranches_hex_for_rsk_len = (job->merklebranch_count * 0x41) - 1;
+	pow.block_txn_count = job->block_template->txn_count;
+	
+	const int rv = datum_queue_add_item(&rsk_block_queue, &pow);
+	
+	struct datum_rsk_state * const state = g_rsk_state;
+	mresult = curl_multi_wakeup(state->curlm);
+	if (mresult != CURLM_OK) {
+		DLOG_ERROR("%s: curl_multi_wakeup failed" DATUM_RSK_CURL_ERROR_FMT ", potentially delaying Rootstock block submission", __func__, DATUM_RSK_CURL_ERROR_VARS_M);
+	}
+	
+	return rv;
 }
