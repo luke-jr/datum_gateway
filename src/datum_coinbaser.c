@@ -186,6 +186,15 @@ int append_extranonce_output(char * const buf, const T_DATUM_STRATUM_JOB * const
 	return sprintf(buf, "0000000000000000106a0e%04" PRIx16, s->enprefix);
 }
 
+static inline
+void append_coinb2_tail(char * const coinb2, int * const idx, const T_DATUM_STRATUM_JOB * const s) {
+	// witness commit output costs 46 bytes
+	// append the default_witness_commitment
+	*idx += sprintf(&coinb2[*idx], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
+	// lock time
+	*idx += sprintf(&coinb2[*idx], "00000000");
+}
+
 void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s, int coinbase_index, int remaining_size, bool space_for_en_in_coinbase, int *cb1idx, int *cb2idx, bool special_coinb1) {
 	// This function finishes off the stratum coinb1+coinb2 using the available outputs in the job and other flags specified.
 	// it does not attempt to maximize coinb1's size to any specific size
@@ -308,12 +317,8 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 		// This is quite unlikely in practice, but, just in case let's make this a prunable OP_RETURN
 		cb2idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb2[cb2idx[coinbase_index]], "0000000000000000036a0100"); // TODO: Is a naked OP_RETURN without any bytes after safe?  Above TODO is probably better than investigating.
 	}
-	
-	// witness commit output costs 46 bytes
-	// append the default_witness_commitment
-	cb2idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb2[cb2idx[coinbase_index]], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
-	// lock time
-	cb2idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb2[cb2idx[coinbase_index]], "00000000");
+
+	append_coinb2_tail(&s->coinbase[coinbase_index].coinb2, &cb2idx[coinbase_index], s);
 }
 
 int datum_stratum_coinbase_fit_to_template(int max_sz, int fixed_bytes, T_DATUM_STRATUM_JOB *s) {
@@ -457,11 +462,7 @@ void generate_base_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool ne
 		k = cb2idx[0];
 	}
 	
-	// witness commit output costs 46 bytes
-	// append the default_witness_commitment
-	cb2idx[0] += sprintf(&s->coinbase[0].coinb2[cb2idx[0]], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
-	// lock time
-	cb2idx[0] += sprintf(&s->coinbase[0].coinb2[cb2idx[0]], "00000000");
+	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s);
 	
 	if (new_block) {
 		// Append the subsidy-only payout to the subsidy_only_coinbase
@@ -663,11 +664,7 @@ void generate_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool empty_o
 		k = cb2idx[0];
 	}
 	
-	// witness commit output costs 46 bytes
-	// append the default_witness_commitment
-	cb2idx[0] += sprintf(&s->coinbase[0].coinb2[cb2idx[0]], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
-	// lock time
-	cb2idx[0] += sprintf(&s->coinbase[0].coinb2[cb2idx[0]], "00000000");
+	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s);
 	
 	if (empty_only) {
 		// Append the subsidy-only payout to the subsidy_only_coinbase
