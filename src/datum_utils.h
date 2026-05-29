@@ -37,6 +37,7 @@
 #define _DATUM_UTILS_H_
 
 #include <ctype.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -50,6 +51,21 @@ bool datum_test_fail_(const char *expr, const char *file, unsigned int line, con
 	((expr) ? true : datum_test_fail_(fake_expr, __FILE__, line, fake_func))
 #define datum_test(expr) \
 	datum_test_(expr, #expr, __LINE__, __func__)
+
+static inline
+void datum_update_timeout(int * const timeout_p, const uint64_t target, const uint64_t now) {
+	if (now < target) {
+		*timeout_p = 0;
+		return;
+	}
+	
+	const uint64_t delta = target - now;
+	if (*timeout_p < 0 && delta > INT_MAX) {
+		*timeout_p = INT_MAX;
+	} else if (delta < (uint64_t)*timeout_p) {
+		*timeout_p = (int)delta;
+	}
+}
 
 uint64_t monotonic_time_seconds(void);
 uint64_t current_time_millis(void);
