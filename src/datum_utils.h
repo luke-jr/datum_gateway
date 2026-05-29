@@ -68,6 +68,7 @@ void datum_update_timeout(int * const timeout_p, const uint64_t target, const ui
 }
 
 uint64_t monotonic_time_seconds(void);
+uint64_t monotonic_time_millis(void);
 uint64_t current_time_millis(void);
 uint64_t current_time_micros(void);
 uint64_t get_process_uptime_seconds(void);
