@@ -36,6 +36,7 @@
 #ifndef _DATUM_UTILS_H_
 #define _DATUM_UTILS_H_
 
+#include <ctype.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -54,6 +55,17 @@ uint64_t monotonic_time_seconds(void);
 uint64_t current_time_millis(void);
 uint64_t current_time_micros(void);
 uint64_t get_process_uptime_seconds(void);
+
+static inline
+bool is_all_hex(const char * const s, const size_t len) {
+	for (size_t i = 0; i < len; ++i) {
+		if (!isxdigit(s[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
 unsigned char hex2bin_uchar(const char *in);
 void build_hex_lookup(void);
 bool my_sha256(void *digest, const void *buffer, size_t length);
@@ -66,6 +78,17 @@ void panic_from_thread(int a);
 bool double_sha256(void *out, const void *in, size_t length);
 void hex_to_bin_le(const char *hex, unsigned char *bin);
 void hex_to_bin(const char *hex, unsigned char *bin);
+
+static inline
+bool hex_to_bin_checked(const char *hex, unsigned char *bin) {
+	while (hex[0]) {
+		if (!(isxdigit(hex[0] && isxdigit(hex[1])))) return false;
+		*(bin++) = hex2bin_uchar(hex);
+		hex = &hex[2];
+	}
+	return true;
+}
+
 void hash2hex(unsigned char *bytes, char *hexString);
 void get_target_from_diff(unsigned char *result, uint64_t diff);
 uint64_t roundDownToPowerOfTwo_64(uint64_t x);
