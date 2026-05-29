@@ -180,6 +180,12 @@ int generate_coinbase_input(int height, char *cb, int *target_pot_index) {
 	return cb_input_sz;
 }
 
+// NOTE: This isn't used if there's room in the coinbase
+static inline
+int append_extranonce_output(char * const buf, const T_DATUM_STRATUM_JOB * const s) {
+	return sprintf(buf, "0000000000000000106a0e%04" PRIx16, s->enprefix);
+}
+
 void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s, int coinbase_index, int remaining_size, bool space_for_en_in_coinbase, int *cb1idx, int *cb2idx, bool special_coinb1) {
 	// This function finishes off the stratum coinb1+coinb2 using the available outputs in the job and other flags specified.
 	// it does not attempt to maximize coinb1's size to any specific size
@@ -233,7 +239,7 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 		
 		if (!special_coinb1) {
 			// append extranonce op_return
-			cb1idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb1[cb1idx[coinbase_index]], "0000000000000000106a0e%04" PRIx16, s->enprefix);
+			cb1idx[coinbase_index] += append_extranonce_output(&s->coinbase[coinbase_index].coinb1[cb1idx[coinbase_index]], s);
 			en_done = true;
 		}
 	}
@@ -258,7 +264,7 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 			} else {
 				if ((special_coinb1) && (k == c1cnt)) {
 					// append extranonce op_return
-					cb1idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb1[cb1idx[coinbase_index]], "0000000000000000106a0e%04" PRIx16, s->enprefix);
+					cb1idx[coinbase_index] += append_extranonce_output(&s->coinbase[coinbase_index].coinb1[cb1idx[coinbase_index]], s);
 					en_done = true;
 				}
 				
@@ -282,7 +288,7 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 	}
 	
 	if ((!space_for_en_in_coinbase) && (!en_done)) {
-		cb1idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb1[cb1idx[coinbase_index]], "0000000000000000106a0e%04" PRIx16, s->enprefix);
+		cb1idx[coinbase_index] += append_extranonce_output(&s->coinbase[coinbase_index].coinb1[cb1idx[coinbase_index]], s);
 		en_done = true;
 	}
 	
@@ -424,7 +430,7 @@ void generate_base_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool ne
 		cb1idx[0] += append_bitcoin_varint_hex(3, &s->coinbase[0].coinb1[cb1idx[0]]); // extranonce, us, and witness commit
 		
 		// append extranonce op_return
-		cb1idx[0] += sprintf(&s->coinbase[0].coinb1[cb1idx[0]], "0000000000000000106a0e%04" PRIx16, s->enprefix);
+		cb1idx[0] += append_extranonce_output(&s->coinbase[0].coinb1[cb1idx[0]], s);
 		
 		if (new_block) {
 			// copy the beginning to the subsidy-only
@@ -630,7 +636,7 @@ void generate_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool empty_o
 		cb1idx[0] += append_bitcoin_varint_hex(3, &s->coinbase[0].coinb1[cb1idx[0]]); // extranonce, us, and witness commit
 		
 		// append extranonce op_return
-		cb1idx[0] += sprintf(&s->coinbase[0].coinb1[cb1idx[0]], "0000000000000000106a0e%04" PRIx16, s->enprefix);
+		cb1idx[0] += append_extranonce_output(&s->coinbase[0].coinb1[cb1idx[0]], s);
 		
 		if (empty_only) {
 			// copy the beginning to the subsidy-only
