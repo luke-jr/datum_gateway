@@ -46,6 +46,8 @@
 	#include "datum_blocktemplates.h"
 #endif
 
+#include "datum_rsk.h"
+
 #define MAX_STRATUM_JOBS 256
 
 #define MAX_COINBASE_TYPES 6
@@ -174,6 +176,9 @@ typedef struct {
 	bool is_datum_job;
 	unsigned char datum_job_idx;
 	unsigned char datum_coinbaser_id;
+	
+	char rsk_commitment_hex_unterminated[RSK_COMMITMENT_SIZE * 2];
+	uint8_t rsk_block_target[RSK_TARGET_SIZE];
 } T_DATUM_STRATUM_JOB;
 
 typedef struct T_DATUM_STRATUM_THREADPOOL_DATA {

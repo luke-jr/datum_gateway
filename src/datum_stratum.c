@@ -58,6 +58,7 @@
 #include "datum_coinbaser.h"
 #include "datum_submitblock.h"
 #include "datum_protocol.h"
+#include "datum_rsk.h"
 
 T_DATUM_SOCKET_APP *global_stratum_app = NULL;
 
@@ -2058,6 +2059,10 @@ void update_stratum_job(T_DATUM_TEMPLATE_DATA *block_template, bool new_block, i
 	
 	// calculate block target from nbits
 	nbits_to_target(s->nbits_uint, s->block_target);
+	
+	if (datum_config.rsk_wsurl[0]) {
+		datum_rsk_get_current_work(s->rsk_commitment_hex_unterminated, s->rsk_block_target);
+	}
 	
 	// if this is to be a clean job, remember that
 	s->is_new_block = new_block;

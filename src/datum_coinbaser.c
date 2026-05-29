@@ -52,6 +52,7 @@
 #include "datum_jsonrpc.h"
 #include "datum_protocol.h"
 #include "datum_coinbaser.h"
+#include "datum_rsk.h"
 
 CURL *coinbaser_curl = NULL;
 
@@ -187,10 +188,21 @@ int append_extranonce_output(char * const buf, const T_DATUM_STRATUM_JOB * const
 }
 
 static inline
-void append_coinb2_tail(char * const coinb2, int * const idx, const T_DATUM_STRATUM_JOB * const s, const bool include_witness_commitment) {
+void append_coinb2_tail(char * const coinb2, int * const idx, const T_DATUM_STRATUM_JOB * const s, const bool include_witness_commitment, const bool include_rsk) {
 	// witness commit output costs 46 bytes
+	unsigned int commitment_len = 0;
 	if (include_witness_commitment) {
-		*idx += sprintf(&coinb2[*idx], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
+		commitment_len += strlen(s->block_template->default_witness_commitment) * 2;
+	} else {
+		++commitment_len;  // Need our own OP_RETURN
+	}
+	if (include_rsk) {
+		commitment_len += RSK_COMMITMENT_OVERHEAD_SIZE + RSK_COMMITMENT_SIZE;
+	}
+	*idx += sprintf(&coinb2[*idx], "0000000000000000%2.2x%s", commitment_len, include_witness_commitment ? s->block_template->default_witness_commitment : "6a");
+	if (include_rsk) {
+		memcpy(&coinb2[*idx], RSK_COMMITMENT_OVERHEAD_HEX, RSK_COMMITMENT_OVERHEAD_SIZE * 2); *idx += 20;
+		memcpy(&coinb2[*idx], s->rsk_commitment_hex_unterminated, sizeof(s->rsk_commitment_hex_unterminated)); *idx += sizeof(s->rsk_commitment_hex_unterminated);
 	}
 	// lock time
 	*idx += sprintf(&coinb2[*idx], "00000000");
@@ -199,6 +211,13 @@ void append_coinb2_tail(char * const coinb2, int * const idx, const T_DATUM_STRA
 void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s, int coinbase_index, int remaining_size, bool space_for_en_in_coinbase, int *cb1idx, int *cb2idx, bool special_coinb1) {
 	// This function finishes off the stratum coinb1+coinb2 using the available outputs in the job and other flags specified.
 	// it does not attempt to maximize coinb1's size to any specific size
+	
+	// We exclude Rootstock from "nicehash" templates to ensure we generate enough outputs
+	// TODO: If there's few enough outputs anyway (quite unlikely), we could add it back in
+	const bool include_rsk = s->rsk_commitment_hex_unterminated[0] && remaining_size > 500;
+	if (include_rsk) {
+		remaining_size -= RSK_COMMITMENT_OVERHEAD_SIZE + RSK_COMMITMENT_SIZE;
+	}
 	
 	int i, j, k, m, i2 = 0, c1cnt = 0;
 	uint64_t mval = 0;
@@ -319,7 +338,7 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 		cb2idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb2[cb2idx[coinbase_index]], "0000000000000000036a0100"); // TODO: Is a naked OP_RETURN without any bytes after safe?  Above TODO is probably better than investigating.
 	}
 
-	append_coinb2_tail(&s->coinbase[coinbase_index].coinb2, &cb2idx[coinbase_index], s, /*include_witness_commitment=*/ true);
+	append_coinb2_tail(&s->coinbase[coinbase_index].coinb2, &cb2idx[coinbase_index], s, /*include_witness_commitment=*/ true, include_rsk);
 }
 
 int datum_stratum_coinbase_fit_to_template(int max_sz, int fixed_bytes, T_DATUM_STRATUM_JOB *s) {
@@ -426,7 +445,9 @@ void generate_base_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool ne
 			// copy the beginning to the subsidy-only
 			memcpy(&s->subsidy_only_coinbase.coinb1[0], &s->coinbase[0].coinb1[0], cb1idx[0]);
 			pk_u64le(s->subsidy_only_coinbase.coinb2, 0, 0x6666666666666666ULL);  // "ffffffff"
-			append_bitcoin_varint_hex(1, &s->subsidy_only_coinbase.coinb2[8]); // just us!
+			if (!s->rsk_commitment_hex_unterminated[0]) {
+				append_bitcoin_varint_hex(1, &s->subsidy_only_coinbase.coinb2[8]); // just us!
+			}
 		}
 	} else {
 		// we're already at the point in coinb1 where we need an output count, which will be 3
@@ -441,7 +462,9 @@ void generate_base_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool ne
 		if (new_block) {
 			// copy the beginning to the subsidy-only
 			memcpy(&s->subsidy_only_coinbase.coinb1[0], &s->coinbase[0].coinb1[0], cb1idx[0]);
-			k = append_bitcoin_varint_hex(2, &s->subsidy_only_coinbase.coinb1[j]); // extranonce and us
+			if (!s->rsk_commitment_hex_unterminated[0]) {
+				k = append_bitcoin_varint_hex(2, &s->subsidy_only_coinbase.coinb1[j]); // extranonce and us
+			}
 			s->subsidy_only_coinbase.coinb1[j+k] = s->coinbase[0].coinb1[j+k];
 		}
 	}
@@ -463,13 +486,13 @@ void generate_base_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool ne
 		k = cb2idx[0];
 	}
 	
-	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s, /*include_witness_commitment=*/ true);
+	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s, /*include_witness_commitment=*/ true, s->rsk_commitment_hex_unterminated[0]);
 	
 	if (new_block) {
 		// Append the subsidy-only payout to the subsidy_only_coinbase
 		sprintf(&s->subsidy_only_coinbase.coinb2[j], "%016llx", (unsigned long long)__builtin_bswap64(block_reward(s->height))); // subsidy calc for height
 		memcpy(&s->subsidy_only_coinbase.coinb2[j+16], &s->coinbase[0].coinb2[j+16], k-j-16);
-		append_coinb2_tail(s->subsidy_only_coinbase.coinb2, &k, s, /*include_witness_commitment=*/ false);
+		append_coinb2_tail(s->subsidy_only_coinbase.coinb2, &k, s, /*include_witness_commitment=*/ false, s->rsk_commitment_hex_unterminated[0]);
 	}
 	
 	// End of 0 / Empty
@@ -628,7 +651,9 @@ void generate_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool empty_o
 			// copy the beginning to the subsidy-only
 			memcpy(&s->subsidy_only_coinbase.coinb1[0], &s->coinbase[0].coinb1[0], cb1idx[0]);
 			pk_u64le(s->subsidy_only_coinbase.coinb2, 0, 0x6666666666666666ULL);  // "ffffffff"
-			append_bitcoin_varint_hex(1, &s->subsidy_only_coinbase.coinb2[8]); // just us!
+			if (!s->rsk_commitment_hex_unterminated[0]) {
+				append_bitcoin_varint_hex(1, &s->subsidy_only_coinbase.coinb2[8]); // just us!
+			}
 		}
 	} else {
 		// we're already at the point in coinb1 where we need an output count, which will be 3
@@ -643,7 +668,9 @@ void generate_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool empty_o
 		if (empty_only) {
 			// copy the beginning to the subsidy-only
 			memcpy(&s->subsidy_only_coinbase.coinb1[0], &s->coinbase[0].coinb1[0], cb1idx[0]);
-			k = append_bitcoin_varint_hex(2, &s->subsidy_only_coinbase.coinb1[j]); // extranonce and us
+			if (!s->rsk_commitment_hex_unterminated[0]) {
+				k = append_bitcoin_varint_hex(2, &s->subsidy_only_coinbase.coinb1[j]); // extranonce and us
+			}
 			s->subsidy_only_coinbase.coinb1[j+k] = s->coinbase[0].coinb1[j+k];
 		}
 	}
@@ -665,13 +692,13 @@ void generate_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool empty_o
 		k = cb2idx[0];
 	}
 	
-	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s, /*include_witness_commitment=*/ true);
+	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s, /*include_witness_commitment=*/ true, s->rsk_commitment_hex_unterminated[0]);
 	
 	if (empty_only) {
 		// Append the subsidy-only payout to the subsidy_only_coinbase
 		sprintf(&s->subsidy_only_coinbase.coinb2[j], "%016llx", (unsigned long long)__builtin_bswap64(block_reward(s->height))); // subsidy calc for height
 		memcpy(&s->subsidy_only_coinbase.coinb2[j+16], &s->coinbase[0].coinb2[j+16], k-j-16);
-		append_coinb2_tail(s->subsidy_only_coinbase.coinb2, &k, s, /*include_witness_commitment=*/ false);
+		append_coinb2_tail(s->subsidy_only_coinbase.coinb2, &k, s, /*include_witness_commitment=*/ false, s->rsk_commitment_hex_unterminated[0]);
 	}
 	
 	// End of 0 / Empty
