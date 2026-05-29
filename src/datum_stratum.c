@@ -1151,15 +1151,16 @@ int client_mining_submit(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj
 		full_cb_txn[job->target_pot_index] = floorPoT(m->stratum_job_diffs[g_job_index]);
 	}
 	
+	const size_t full_cb_txn_len = cb->coinb1_len+12+cb->coinb2_len;
 	if ((job->merklebranch_count) && (!empty_work)) {
 		// hash the CB txn
-		double_sha256(digest_temp, full_cb_txn, cb->coinb1_len+12+cb->coinb2_len);
+		double_sha256(digest_temp, full_cb_txn, full_cb_txn_len);
 		
 		// calc root
 		stratum_job_merkle_root_calc(job, digest_temp, &block_header[36]);
 	} else {
 		// empty block means coinbase txn hash is the merkleroot
-		double_sha256(&block_header[36], full_cb_txn, cb->coinb1_len+12+cb->coinb2_len);
+		double_sha256(&block_header[36], full_cb_txn, full_cb_txn_len);
 	}
 	
 	// 68 - 71 = ntime
