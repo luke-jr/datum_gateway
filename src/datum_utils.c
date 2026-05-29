@@ -360,9 +360,9 @@ void hex_to_bin_le(const char *hex, unsigned char *bin) {
 }
 
 void hex_to_bin(const char *hex, unsigned char *bin) {
-	size_t len = strlen(hex);
-	for (size_t i = 0; i < len>>1; i++) {
-		bin[i] = hex2bin_uchar(&hex[(i<<1)]);
+	while (hex[0] && hex[1]) {
+		*(bin++) = hex2bin_uchar(hex);
+		hex = &hex[2];
 	}
 }
 
