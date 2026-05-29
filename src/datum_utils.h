@@ -106,7 +106,10 @@ bool hex_to_bin_checked(const char *hex, unsigned char *bin) {
 	return true;
 }
 
-void hash2hex(unsigned char *bytes, char *hexString);
+void bin2hex(char *hexString, const void *bytes, size_t len, bool terminate);
+static inline void hash2hex(unsigned char * const bytes, char *const hexString) {
+	bin2hex(hexString, bytes, /*len=*/ 32, /*terminate=*/ true);
+}
 void get_target_from_diff(unsigned char *result, uint64_t diff);
 uint64_t roundDownToPowerOfTwo_64(uint64_t x);
 int addr_2_output_script(const char *addr, unsigned char *script, int max_len);

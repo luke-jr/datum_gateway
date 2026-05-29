@@ -387,15 +387,16 @@ void panic_from_thread(int a) {
 	while(1) sleep(1);
 }
 
-void hash2hex(unsigned char *bytes, char *hexString) {
+void bin2hex(char * const hexString, const void * const bytes, const size_t len, const bool terminate) {
+	const uint8_t * const bytes_u8 = bytes;
 	const char hexDigits[] = "0123456789abcdef";
 	
-	for (int i = 0; i < 32; ++i) {
-		hexString[i * 2]     = hexDigits[(bytes[i] >> 4) & 0x0F];
-		hexString[i * 2 + 1] = hexDigits[bytes[i] & 0x0F];
+	for (int i = 0; i < len; ++i) {
+		hexString[i * 2]     = hexDigits[(bytes_u8[i] >> 4) & 0x0F];
+		hexString[i * 2 + 1] = hexDigits[bytes_u8[i] & 0x0F];
 	}
 	
-	hexString[64] = '\0';
+	if (terminate) hexString[len * 2] = '\0';
 }
 
 int addr_2_output_script(const char *addr, unsigned char *script, int max_len) {
