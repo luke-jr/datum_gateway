@@ -187,10 +187,11 @@ int append_extranonce_output(char * const buf, const T_DATUM_STRATUM_JOB * const
 }
 
 static inline
-void append_coinb2_tail(char * const coinb2, int * const idx, const T_DATUM_STRATUM_JOB * const s) {
+void append_coinb2_tail(char * const coinb2, int * const idx, const T_DATUM_STRATUM_JOB * const s, const bool include_witness_commitment) {
 	// witness commit output costs 46 bytes
-	// append the default_witness_commitment
-	*idx += sprintf(&coinb2[*idx], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
+	if (include_witness_commitment) {
+		*idx += sprintf(&coinb2[*idx], "0000000000000000%2.2x%s", (unsigned int)strlen(s->block_template->default_witness_commitment)>>1, s->block_template->default_witness_commitment);
+	}
 	// lock time
 	*idx += sprintf(&coinb2[*idx], "00000000");
 }
@@ -318,7 +319,7 @@ void generate_coinbase_txns_for_stratum_job_subtypebysize(T_DATUM_STRATUM_JOB *s
 		cb2idx[coinbase_index] += sprintf(&s->coinbase[coinbase_index].coinb2[cb2idx[coinbase_index]], "0000000000000000036a0100"); // TODO: Is a naked OP_RETURN without any bytes after safe?  Above TODO is probably better than investigating.
 	}
 
-	append_coinb2_tail(&s->coinbase[coinbase_index].coinb2, &cb2idx[coinbase_index], s);
+	append_coinb2_tail(&s->coinbase[coinbase_index].coinb2, &cb2idx[coinbase_index], s, /*include_witness_commitment=*/ true);
 }
 
 int datum_stratum_coinbase_fit_to_template(int max_sz, int fixed_bytes, T_DATUM_STRATUM_JOB *s) {
@@ -462,13 +463,13 @@ void generate_base_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool ne
 		k = cb2idx[0];
 	}
 	
-	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s);
+	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s, /*include_witness_commitment=*/ true);
 	
 	if (new_block) {
 		// Append the subsidy-only payout to the subsidy_only_coinbase
 		sprintf(&s->subsidy_only_coinbase.coinb2[j], "%016llx", (unsigned long long)__builtin_bswap64(block_reward(s->height))); // subsidy calc for height
 		memcpy(&s->subsidy_only_coinbase.coinb2[j+16], &s->coinbase[0].coinb2[j+16], k-j-16);
-		sprintf(&s->subsidy_only_coinbase.coinb2[k], "00000000");
+		append_coinb2_tail(s->subsidy_only_coinbase.coinb2, &k, s, /*include_witness_commitment=*/ false);
 	}
 	
 	// End of 0 / Empty
@@ -664,13 +665,13 @@ void generate_coinbase_txns_for_stratum_job(T_DATUM_STRATUM_JOB *s, bool empty_o
 		k = cb2idx[0];
 	}
 	
-	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s);
+	append_coinb2_tail(&s->coinbase[0].coinb2, &cb2idx[0], s, /*include_witness_commitment=*/ true);
 	
 	if (empty_only) {
 		// Append the subsidy-only payout to the subsidy_only_coinbase
 		sprintf(&s->subsidy_only_coinbase.coinb2[j], "%016llx", (unsigned long long)__builtin_bswap64(block_reward(s->height))); // subsidy calc for height
 		memcpy(&s->subsidy_only_coinbase.coinb2[j+16], &s->coinbase[0].coinb2[j+16], k-j-16);
-		sprintf(&s->subsidy_only_coinbase.coinb2[k], "00000000");
+		append_coinb2_tail(s->subsidy_only_coinbase.coinb2, &k, s, /*include_witness_commitment=*/ false);
 	}
 	
 	// End of 0 / Empty
