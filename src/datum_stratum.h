@@ -136,8 +136,8 @@ typedef struct {
 	T_DATUM_TEMPLATE_DATA *block_template;
 	
 	unsigned char merklebranch_count;
-	char merklebranches_hex[24][72];
-	unsigned char merklebranches_bin[24][32];
+	char merklebranches_hex[MAX_MERKLE_BRANCHES][72];
+	unsigned char merklebranches_bin[MAX_MERKLE_BRANCHES][32];
 	
 	char merklebranches_full[4096];
 	

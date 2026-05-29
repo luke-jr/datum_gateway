@@ -53,6 +53,8 @@
 
 #define MAX_COINBASE_TXN_SIZE_BYTES (((STRATUM_COINBASE1_MAX_LEN+STRATUM_COINBASE2_MAX_LEN)>>1)+64)
 
+#define MAX_MERKLE_BRANCHES 32
+
 #define STRATUM_JOB_INDEX_XOR ((uint16_t)0xC0DE)
 
 void datum_print_banner(void);
