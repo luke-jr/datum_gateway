@@ -26,10 +26,11 @@ jobs:
 
       - name: Build and test
         run: |
+          /usr/bin/python3 -m pip install --user git+https://github.com/Mic92/strace-macos
           cmake -S . -B build -DCMAKE_C_FLAGS="${GLOBAL_CFLAGS}"
           cmake --build build --parallel
           ./build/datum_gateway --help
-          ./build/datum_gateway --test
+          "$HOME/Library/Python/3.9/bin/strace" ./build/datum_gateway --test
 
   build:
     strategy:
