@@ -77,7 +77,7 @@ const T_DATUM_CONFIG_ITEM datum_config_options[] = {
 		.example = "\"http://localhost:8332\"",
 		.required = true, .ptr = datum_config.bitcoind_rpcurl, .max_string_len = sizeof(datum_config.bitcoind_rpcurl) },
 	{ .var_type = DATUM_CONF_INT, 		.category = "bitcoind", 	.name = "parent_fetch_timeout_seconds",	.description = "Maximum seconds to wait for a raw parent block RPC response. (1-300)",
-		.required = false, .ptr = &datum_config.bitcoind_parent_fetch_timeout_seconds, .default_int = 5 },
+		.required = false, .ptr = &datum_config.bitcoind_parent_fetch_timeout_seconds, .default_int = 15 },
 	{ .var_type = DATUM_CONF_INT,	 	.category = "bitcoind", 	.name = "work_update_seconds",		.description = "How many seconds between normal work updates?  (5-120, 40 suggested)",
 		.required = false, .ptr = &datum_config.bitcoind_work_update_seconds, .default_int = 40 },
 	{ .var_type = DATUM_CONF_BOOL,	 	.category = "bitcoind", 	.name = "notify_fallback",			.description = "Fall back to less efficient methods for new block notifications. Can disable if you use blocknotify.",
