@@ -54,7 +54,7 @@ bool submitblock_ptr_owned = false;
 char submitblock_hash[256] = { 0 };
 
 static
-void preciousblock(CURL * const curl, const char * const url, const char * const blockhash) {
+void preciousblock(CURL ** const curl, const char * const url, const char * const blockhash) {
 	json_t *json;
 	char rpc_data[384];
 	
@@ -107,7 +107,7 @@ bool datum_submitblock_log_reply(const json_t *reply, const char *block_hash_hex
 	}
 }
 
-void datum_submitblock_doit(CURL * const tcurl, const char * const url, const char * const submitblock_req, const char * const block_hash_hex) {
+void datum_submitblock_doit(CURL ** const tcurl, const char * const url, const char * const submitblock_req, const char * const block_hash_hex) {
 	json_t *r;
 	// TODO: Move these types of things to the conf file
 	if (!url) {
@@ -146,12 +146,12 @@ void *datum_submitblock_thread(void *ptr) {
 		if (submitblock_ptr != NULL) {
 			DLOG_DEBUG("SUBMITTING BLOCK TO OUR NODE!");
 			
-			datum_submitblock_doit(tcurl,NULL,submitblock_ptr,submitblock_hash);
+			datum_submitblock_doit(&tcurl, NULL, submitblock_ptr, submitblock_hash);
 			
 			if (datum_config.extra_block_submissions_count > 0) {
 				for(i=0;i<datum_config.extra_block_submissions_count;i++) {
 					DLOG_DEBUG("SUBMITTING BLOCK TO EXTRA NODE %d!",i+1);
-					datum_submitblock_doit(tcurl, datum_config.extra_block_submissions_urls[i], submitblock_ptr, submitblock_hash);
+					datum_submitblock_doit(&tcurl, datum_config.extra_block_submissions_urls[i], submitblock_ptr, submitblock_hash);
 				}
 			}
 			if (submitblock_ptr_owned) free((void *)submitblock_ptr);

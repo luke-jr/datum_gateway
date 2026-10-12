@@ -140,7 +140,21 @@ err_out:
 	return NULL;
 }
 
-json_t *json_rpc_call_full(CURL *curl, const char *url, const char *userpass, const char *rpc_req, const char *extra_header, long * const http_resp_code_out) {
+static
+bool replace_curl_handle(CURL ** const curl) {
+	assert(curl);
+	curl_easy_cleanup(*curl);
+	*curl = curl_easy_init();
+	if (*curl) {
+		DLOG_DEBUG("Reinitialized cURL handle after JSON-RPC failure");
+		return true;
+	}
+	DLOG_ERROR("Could not reinitialize cURL after JSON-RPC failure");
+	return false;
+}
+
+static
+json_t *json_rpc_call_once(CURL ** const curl_handle, const char * const url, const char * const userpass, const char * const rpc_req, const char * const extra_header, long * const http_resp_code_out) {
 	json_t *val, *err_val, *res_val;
 	CURLcode rc;
 	struct data_buffer all_data = { };
@@ -149,6 +163,9 @@ json_t *json_rpc_call_full(CURL *curl, const char *url, const char *userpass, co
 	struct curl_slist *headers = NULL;
 	char curl_err_str[CURL_ERROR_SIZE];
 	bool check_for_result = true;
+	assert(curl_handle);
+	if (!*curl_handle && !replace_curl_handle(curl_handle)) return NULL;
+	CURL * const curl = *curl_handle;
 	
 	curl_err_str[0] = '\0';
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -193,7 +210,7 @@ json_t *json_rpc_call_full(CURL *curl, const char *url, const char *userpass, co
 		goto err_out;
 	}
 	
-	val = JSON_LOADS(all_data.buf, &err);
+	val = all_data.buf ? JSON_LOADS(all_data.buf, &err) : NULL;
 	if (!val) {
 		DLOG_DEBUG("JSON decode failed(%d): %s", err.line, err.text);
 		goto err_out;
@@ -237,12 +254,25 @@ json_t *json_rpc_call_full(CURL *curl, const char *url, const char *userpass, co
 err_out:
 	databuf_free(&all_data);
 	curl_slist_free_all(headers);
-	curl_easy_reset(curl);
+	replace_curl_handle(curl_handle);
 	return NULL;
 }
 
-json_t *json_rpc_call(CURL *curl, const char *url, const char *userpass, const char *rpc_req) {
-	return json_rpc_call_full(curl, url, userpass, rpc_req, NULL, NULL);
+static
+json_t *json_rpc_call_retry(CURL ** const curl, const char * const url, const char * const userpass, const char * const rpc_req, global_config_t * const cookie_cfg) {
+	for (int attempt = 0; attempt < 2; ++attempt) {
+		long http_resp_code = -1;
+		json_t * const result = json_rpc_call_once(curl, url, userpass, rpc_req, NULL, &http_resp_code);
+		if (result) return result;
+		if (attempt) return NULL;
+		if (cookie_cfg && !cookie_cfg->bitcoind_rpcuser[0] && http_resp_code == 401 && !update_rpc_cookie(cookie_cfg)) return NULL;
+		DLOG_DEBUG("JSON-RPC request failed; retrying once with a fresh cURL handle");
+	}
+	return NULL;
+}
+
+json_t *json_rpc_call(CURL ** const curl, const char * const url, const char * const userpass, const char * const rpc_req) {
+	return json_rpc_call_retry(curl, url, userpass, rpc_req, NULL);
 }
 
 bool update_rpc_cookie(global_config_t * const cfg) {
@@ -267,14 +297,6 @@ void update_rpc_auth(global_config_t * const cfg) {
 	}
 }
 
-json_t *bitcoind_json_rpc_call(CURL * const curl, global_config_t * const cfg, const char * const rpc_req) {
-	long http_resp_code = -1;
-	json_t *j = json_rpc_call_full(curl, cfg->bitcoind_rpcurl, cfg->bitcoind_rpcuserpass, rpc_req, NULL, &http_resp_code);
-	if (j) return j;
-	if (cfg->bitcoind_rpcuser[0]) return NULL;
-	if (http_resp_code != 401) return NULL;
-	
-	// Authentication failure using cookie; reload cookie file and try again
-	if (!update_rpc_cookie(cfg)) return NULL;
-	return json_rpc_call(curl, cfg->bitcoind_rpcurl, cfg->bitcoind_rpcuserpass, rpc_req);
+json_t *bitcoind_json_rpc_call(CURL ** const curl, global_config_t * const cfg, const char * const rpc_req) {
+	return json_rpc_call_retry(curl, cfg->bitcoind_rpcurl, cfg->bitcoind_rpcuserpass, rpc_req, cfg);
 }
