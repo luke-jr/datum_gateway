@@ -101,45 +101,6 @@ static size_t upload_data_cb(void *ptr, size_t size, size_t nmemb, void *user_da
 	return len;
 }
 
-char *basic_http_call(CURL *curl, const char *url) {
-	CURLcode rc;
-	struct data_buffer all_data = { };
-	char curl_err_str[CURL_ERROR_SIZE];
-	char *out;
-	
-	curl_err_str[0] = '\0';
-	curl_easy_setopt(curl, CURLOPT_URL, url);
-	curl_easy_setopt(curl, CURLOPT_ENCODING, "");
-	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-	curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, all_data_cb);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &all_data);
-	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_err_str);
-	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L); // quick timeout!
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L); // quick timeout!
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	
-	rc = curl_easy_perform(curl);
-	if (rc) {
-		DLOG_DEBUG("HTTP request failed: %s", curl_err_str[0] ? curl_err_str : curl_easy_strerror(rc));
-		goto err_out;
-	}
-	
-	out = calloc(strlen(all_data.buf)+20,1);
-	if (!out) goto err_out;
-	
-	strcpy(out, all_data.buf);
-	
-	databuf_free(&all_data);
-	curl_easy_reset(curl);
-	return out;
-
-err_out:
-	databuf_free(&all_data);
-	curl_easy_reset(curl);
-	return NULL;
-}
-
 static
 bool replace_curl_handle(CURL ** const curl) {
 	assert(curl);
