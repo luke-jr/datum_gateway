@@ -107,6 +107,7 @@ char *basic_http_call(CURL *curl, const char *url) {
 	char curl_err_str[CURL_ERROR_SIZE];
 	char *out;
 	
+	curl_err_str[0] = '\0';
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_ENCODING, "");
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
@@ -120,7 +121,7 @@ char *basic_http_call(CURL *curl, const char *url) {
 	
 	rc = curl_easy_perform(curl);
 	if (rc) {
-		DLOG_DEBUG("HTTP request failed: %s", curl_err_str);
+		DLOG_DEBUG("HTTP request failed: %s", curl_err_str[0] ? curl_err_str : curl_easy_strerror(rc));
 		goto err_out;
 	}
 	
@@ -149,6 +150,7 @@ json_t *json_rpc_call_full(CURL *curl, const char *url, const char *userpass, co
 	char curl_err_str[CURL_ERROR_SIZE];
 	bool check_for_result = true;
 	
+	curl_err_str[0] = '\0';
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_ENCODING, "");
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
@@ -186,7 +188,7 @@ json_t *json_rpc_call_full(CURL *curl, const char *url, const char *userpass, co
 	rc = curl_easy_perform(curl);
 	if (rc) {
 		if (http_resp_code_out) curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, http_resp_code_out);
-		DLOG_DEBUG("json_rpc_call: HTTP request failed: %s", curl_err_str);
+		DLOG_DEBUG("json_rpc_call: HTTP request failed: %s", curl_err_str[0] ? curl_err_str : curl_easy_strerror(rc));
 		DLOG_DEBUG("json_rpc_call: Request was: %s",rpc_req);
 		goto err_out;
 	}
