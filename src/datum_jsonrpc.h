@@ -54,10 +54,6 @@
 #define bitcoin_rpc_url global_config.bitcoind_url
 #define bitcoin_rpc_userpass global_config.bitcoind_userpass
 
-struct data_buffer {
-	void            *buf;
-	size_t          len;
-};
 struct upload_buffer {
 	const void      *buf;
 	size_t          len;

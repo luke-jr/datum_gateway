@@ -46,41 +46,16 @@
 #include "datum_jsonrpc.h"
 #include "datum_utils.h"
 
-// TODO: Clean this up.  Most of this is very old code from other parts of Eligius/OCEAN internal tools and needs
-// a solid makeover.
-// However, it's all quite functional, so not a top priority.
-
-static void databuf_free(struct data_buffer *db) {
-	if (!db) {
-		return;
-	}
-	
-	free(db->buf);
-	memset(db, 0, sizeof(*db));
-}
-
 static size_t all_data_cb(const void *ptr, size_t size, size_t nmemb, void *user_data) {
-	struct data_buffer *db = user_data;
-	size_t len, oldlen, newlen;
-	void *newmem;
+	struct buf * const buf = user_data;
+	size_t len;
 	
 	if (SIZE_MAX / size < nmemb) abort();
 	len = size * nmemb;
 	
-	oldlen = db->len;
-	if (SIZE_MAX - oldlen < len) abort();
-	newlen = oldlen + len;
+	if (!buf_append(buf, ptr, len)) return 0;
 	
-	newmem = realloc(db->buf, newlen + 1);
-	if (!newmem) {
-		return 0;
-	}
-	
-	db->buf = newmem;
-	db->len = newlen;
-	memcpy(&((char *)db->buf)[oldlen], ptr, len);
-	((char *)db->buf)[newlen] = 0;
-	
+	// NOTE: libcurl expects a different return value than write(2)
 	return len;
 }
 
@@ -118,7 +93,7 @@ static
 json_t *json_rpc_call_once(CURL ** const curl_handle, const char * const url, const char * const userpass, const char * const rpc_req, const char * const extra_header, long * const http_resp_code_out) {
 	json_t *val, *err_val, *res_val;
 	CURLcode rc;
-	struct data_buffer all_data = { };
+	struct buf resp_buf = BUF_INIT;
 	struct upload_buffer upload_data;
 	json_error_t err = { };
 	struct curl_slist *headers = NULL;
@@ -134,7 +109,7 @@ json_t *json_rpc_call_once(CURL ** const curl_handle, const char * const url, co
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 	curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, all_data_cb);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &all_data);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp_buf);
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, upload_data_cb);
 	curl_easy_setopt(curl, CURLOPT_READDATA, &upload_data);
 	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_err_str);
@@ -171,7 +146,13 @@ json_t *json_rpc_call_once(CURL ** const curl_handle, const char * const url, co
 		goto err_out;
 	}
 	
-	val = all_data.buf ? JSON_LOADS(all_data.buf, &err) : NULL;
+	if (resp_buf.len && buf_nullterminate(&resp_buf)) {
+		val = JSON_LOADS(resp_buf.s, &err);
+	} else {
+		DLOG_DEBUG("HTTP request returned 0 bytes");
+		DLOG_DEBUG("Request was: %s", rpc_req);
+		goto err_out;
+	}
 	if (!val) {
 		DLOG_DEBUG("JSON decode failed(%d): %s", err.line, err.text);
 		goto err_out;
@@ -207,13 +188,13 @@ json_t *json_rpc_call_once(CURL ** const curl_handle, const char * const url, co
 		}
 	}
 	
-	databuf_free(&all_data);
+	free(resp_buf.s);
 	curl_slist_free_all(headers);
 	curl_easy_reset(curl);
 	return val;
 
 err_out:
-	databuf_free(&all_data);
+	free(resp_buf.s);
 	curl_slist_free_all(headers);
 	replace_curl_handle(curl_handle);
 	return NULL;
