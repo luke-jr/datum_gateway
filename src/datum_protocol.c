@@ -1584,12 +1584,19 @@ void datum_protocol_job_validation_send_error(unsigned char * const msg, const u
 
 static
 int datum_protocol_job_validation_send_reply(unsigned char * const msg, int len, const uint8_t job_index, const size_t txn_count, const char * const what) {
-	len += (int)datum_protocol_random_padding(&msg[len], 111);
+	size_t padding = datum_protocol_random_padding(&msg[len], 111);
 	if (len > DATUM_BULK_FRAGMENT_DATA_SIZE) {
+		len += (int)padding;
 		if (datum_protocol_bulk_cmd(msg, len)) {
 			DLOG_WARN("Could not queue large transaction-validation reply");
 		}
 	} else {
+		if (padding < DATUM_BULK_FRAGMENT_DATA_SIZE - len) {
+			len += (int)padding;
+		} else {
+			// Limit padding so we can avoid a bulk transfer
+			len = DATUM_BULK_FRAGMENT_DATA_SIZE;
+		}
 		datum_protocol_mining_cmd(msg, len);
 	}
 	
