@@ -1583,13 +1583,16 @@ void datum_protocol_job_validation_send_error(unsigned char * const msg, const u
 }
 
 static
-int datum_protocol_job_validation_send_reply(unsigned char * const msg, int len, const uint8_t job_index, const size_t txn_count, const char * const what) {
+int datum_protocol_job_validation_send_reply(unsigned char * const msg, int len, const uint8_t job_index, const size_t txn_count, const char * const what, const uint8_t err_cmd) {
 	size_t padding = datum_protocol_random_padding(&msg[len], 111);
 	if (len > DATUM_BULK_FRAGMENT_DATA_SIZE) {
 		len += (int)padding;
 		if (datum_protocol_bulk_cmd(msg, len)) {
 			DLOG_WARN("Could not queue large transaction-validation reply");
+			datum_protocol_job_validation_send_error(msg, err_cmd, job_index, DATUM_VALIDATION_ERROR_BUSY);
+			return 1;
 		}
+		DLOG_DEBUG("Sending %s to server for job %d (%d bytes for %zu txns)", what, job_index, len, txn_count);
 	} else {
 		if (padding < DATUM_BULK_FRAGMENT_DATA_SIZE - len) {
 			len += (int)padding;
@@ -1600,7 +1603,7 @@ int datum_protocol_job_validation_send_reply(unsigned char * const msg, int len,
 		datum_protocol_mining_cmd(msg, len);
 	}
 	
-	DLOG_DEBUG("sent %s to server for job %d (%d bytes for %zu txns)", what, job_index, len, txn_count);
+	DLOG_DEBUG("Sent %s to server for job %d (%d bytes for %zu txns)", what, job_index, len, txn_count);
 	
 	return 1;
 }
@@ -1702,7 +1705,7 @@ int datum_protocol_job_validation_stxlist(const int len, const unsigned char * c
 	memcpy(&msg[i], &crosscheck[0], 0x20); i += 0x20;
 	msg[i] = 0xFE; i++;
 	
-	return datum_protocol_job_validation_send_reply(msg, i, job_index, block_template->txn_count, "short txn list");
+	return datum_protocol_job_validation_send_reply(msg, i, job_index, block_template->txn_count, "short txn list", 0x90);
 }
 
 // The 0x50 0x11 reply is built in temp_data and sent as one command, so it
@@ -1802,7 +1805,7 @@ int datum_protocol_job_validation_stxlist_byid(const int len, const unsigned cha
 	pthread_rwlock_unlock(&datum_jobs_rwlock);
 	msg[i] = 0xFE; i++;
 	
-	return datum_protocol_job_validation_send_reply(msg, i, job_index, req_count, "full txns");
+	return datum_protocol_job_validation_send_reply(msg, i, job_index, req_count, "full txns", 0x91);
 }
 
 int datum_protocol_job_validation_sblock(const int len, const unsigned char * const data) {
@@ -1866,9 +1869,12 @@ int datum_protocol_job_validation_sblock(const int len, const unsigned char * co
 	pthread_rwlock_unlock(&datum_jobs_rwlock);
 	msg[i] = 0xFE; i++;
 	// no random data here for size safety. this is also already expensive, potentially taking seconds to transmit.
-	if (datum_protocol_bulk_cmd(msg, i))
+	if (datum_protocol_bulk_cmd(msg, i)) {
 		DLOG_WARN("Could not queue full template-validation reply");
-	DLOG_DEBUG("sent full block of txns to server for job %d (%d bytes)",job_index,i);
+		datum_protocol_job_validation_send_error(msg, 0x92, job_index, DATUM_VALIDATION_ERROR_BUSY);
+		return 1;
+	}
+	DLOG_DEBUG("Sending full block of txns to server for job %d (%d bytes)", job_index, i);
 	return 1;
 }
 
@@ -1893,6 +1899,13 @@ static void datum_protocol_parent_fetch_reply(
 			msg, (int)message_size, session_generation) :
 		datum_protocol_encrypted_cmd(
 			5, msg, (int)message_size, false, session_generation);
+	if (sent && block_size) {
+		DLOG_WARN("Could not queue unknown-parent fetch reply");
+		free(msg);
+		datum_protocol_parent_fetch_reply(job_id, session_generation,
+			DATUM_PROTOCOL_REPLY_BUSY, parent_hash, NULL, 0);
+		return;
+	}
 	if (sent) DLOG_WARN("Could not send unknown-parent fetch reply");
 	free(msg);
 }
