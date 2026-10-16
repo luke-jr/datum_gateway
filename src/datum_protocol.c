@@ -1582,6 +1582,22 @@ void datum_protocol_job_validation_send_error(unsigned char * const msg, const u
 	datum_protocol_mining_cmd(msg, 4 + j);
 }
 
+static
+int datum_protocol_job_validation_send_reply(unsigned char * const msg, int len, const uint8_t job_index, const size_t txn_count, const char * const what) {
+	len += (int)datum_protocol_random_padding(&msg[len], 111);
+	if (len > DATUM_BULK_FRAGMENT_DATA_SIZE) {
+		if (datum_protocol_bulk_cmd(msg, len)) {
+			DLOG_WARN("Could not queue large transaction-validation reply");
+		}
+	} else {
+		datum_protocol_mining_cmd(msg, len);
+	}
+	
+	DLOG_DEBUG("sent %s to server for job %d (%d bytes for %zu txns)", what, job_index, len, txn_count);
+	
+	return 1;
+}
+
 int datum_protocol_job_validation_stxlist(const int len, const unsigned char * const data) {
 	if (len < 1) return 0;
 	// similar to compact blocks, we're going to send a list of short transaction IDs for the requested job
@@ -1679,17 +1695,7 @@ int datum_protocol_job_validation_stxlist(const int len, const unsigned char * c
 	memcpy(&msg[i], &crosscheck[0], 0x20); i += 0x20;
 	msg[i] = 0xFE; i++;
 	
-	i += (int)datum_protocol_random_padding(&msg[i], 111);
-	if (i > DATUM_BULK_FRAGMENT_DATA_SIZE) {
-		if (datum_protocol_bulk_cmd(msg, i))
-			DLOG_WARN("Could not queue large transaction-validation reply");
-	} else {
-		datum_protocol_mining_cmd(msg, i);
-	}
-	
-	DLOG_DEBUG("sent short txn list to server for job %d (%d bytes)",job_index,i);
-	
-	return 1;
+	return datum_protocol_job_validation_send_reply(msg, i, job_index, block_template->txn_count, "short txn list");
 }
 
 // The 0x50 0x11 reply is built in temp_data and sent as one command, so it
@@ -1789,17 +1795,7 @@ int datum_protocol_job_validation_stxlist_byid(const int len, const unsigned cha
 	pthread_rwlock_unlock(&datum_jobs_rwlock);
 	msg[i] = 0xFE; i++;
 	
-	i += (int)datum_protocol_random_padding(&msg[i], 111);
-	if (i > DATUM_BULK_FRAGMENT_DATA_SIZE) {
-		if (datum_protocol_bulk_cmd(msg, i))
-			DLOG_WARN("Could not queue large transaction-validation reply");
-	} else {
-		datum_protocol_mining_cmd(msg, i);
-	}
-	
-	DLOG_DEBUG("sent full txns to server for job %d (%d bytes for %d txns)",job_index,i,(int)req_count);
-	
-	return 1;
+	return datum_protocol_job_validation_send_reply(msg, i, job_index, req_count, "full txns");
 }
 
 int datum_protocol_job_validation_sblock(const int len, const unsigned char * const data) {
