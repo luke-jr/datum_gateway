@@ -1598,8 +1598,13 @@ int send_mining_set_difficulty(T_DATUM_CLIENT_DATA *c) {
 	return 0;
 }
 
+static
 void datum_stratum_fingerprint_by_UA(T_DATUM_MINER_DATA *m) {
-	// TODO: Stub for now
+	// Known Obelisk SC1 firmware reports only this generic cgminer version and requires a 32-bit extranonce2
+	if (!strcmp(m->useragent, "cgminer/4.10.0")) {
+		m->extranonce2_size = 4;
+		return;
+	}
 }
 
 int client_mining_subscribe(T_DATUM_CLIENT_DATA *c, uint64_t id, json_t *params_obj) {
